@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>PwanDeal</title>
+</head>
+<body>
+<h1>Welcome to PwanDeal</h1>
+<p>Pwani University Student Marketplace</p>
+</body>
+</html>
