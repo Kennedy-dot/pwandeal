@@ -1,6 +1,6 @@
 <?php
 /**
- * PwanDeal - Edit Existing Service
+ * PwanDeal - Edit Existing Service (Resolved)
  */
 session_start();
 require_once __DIR__ . '/../config/database.php';
@@ -13,7 +13,7 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $listing_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// 1. Fetch & Ownership Verification (Including Primary Image)
+// 1. Fetch & Ownership Verification (Joining with images table)
 $stmt = $conn->prepare("
     SELECT l.*, i.image_url 
     FROM listings l 
@@ -45,7 +45,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($price <= 0) $errors[] = "Please enter a valid price.";
 
     if (empty($errors)) {
-        // Start Transaction to ensure both table updates succeed
         $conn->begin_transaction();
 
         try {
@@ -57,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $update_stmt->bind_param("ssdisii", $title, $description, $price, $category_id, $status, $listing_id, $user_id);
             $update_stmt->execute();
 
-            // Handle Image Upload if provided
+            // Handle Image Upload
             if (isset($_FILES['image']) && $_FILES['image']['error'] === 0) {
                 $allowed = ['jpg', 'jpeg', 'png', 'webp'];
                 $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
@@ -67,19 +66,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $upload_path = "../uploads/services/" . $new_name;
                     
                     if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_path)) {
-                        // 1. Mark existing images as NOT primary
                         $conn->query("UPDATE listing_images SET is_primary = 0 WHERE listing_id = $listing_id");
                         
-                        // 2. Insert new primary image
                         $img_stmt = $conn->prepare("INSERT INTO listing_images (listing_id, image_url, is_primary) VALUES (?, ?, 1)");
                         $img_stmt->bind_param("is", $listing_id, $new_name);
                         $img_stmt->execute();
 
-                        // 3. Optional: Delete old physical file (only if you want to save space)
                         if ($listing['image_url'] && file_exists("../uploads/services/" . $listing['image_url'])) {
                             @unlink("../uploads/services/" . $listing['image_url']);
                         }
-                        $listing['image_url'] = $new_name; // Update local var for the preview
+                        $listing['image_url'] = $new_name;
                     }
                 } else {
                     throw new Exception("Invalid image format.");
@@ -88,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $conn->commit();
             $success = true;
-            $listing['title'] = $title; // Update local var for UI
+            $listing['title'] = $title;
         } catch (Exception $e) {
             $conn->rollback();
             $errors[] = $e->getMessage();
@@ -96,23 +92,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$page_title = "Edit Service";
+$page_title = "Edit " . $listing['title'];
 include '../includes/header.php';
 ?>
 
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <div class="card border-0 shadow-sm rounded-4">
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="my-listings.php" class="text-decoration-none text-muted">My Services</a></li>
+                    <li class="breadcrumb-item active">Edit Listing</li>
+                </ol>
+            </nav>
+
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
                 <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h3 class="fw-bold mb-0">Update Service</h3>
-                        <a href="my-listings.php" class="btn btn-light btn-sm rounded-pill px-3">Back to List</a>
-                    </div>
+                    <h3 class="fw-bold mb-4">Update Service</h3>
 
                     <?php if ($success): ?>
                         <div class="alert alert-success border-0 shadow-sm mb-4">
-                            ✨ <strong>Great!</strong> Your service has been updated. 
+                            ✨ <strong>Success!</strong> Your service has been updated. 
                             <a href="detail.php?id=<?= $listing_id ?>" class="alert-link ms-2">View listing →</a>
                         </div>
                     <?php endif; ?>
@@ -155,10 +155,7 @@ include '../includes/header.php';
 
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Price (KSh)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-white border-end-0">KSh</span>
-                                    <input type="number" name="price" class="form-control border-start-0" value="<?= $listing['price'] ?>" required>
-                                </div>
+                                <input type="number" name="price" class="form-control" value="<?= $listing['price'] ?>" required>
                             </div>
 
                             <div class="col-12">
@@ -169,16 +166,15 @@ include '../includes/header.php';
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Status</label>
                                 <select name="status" class="form-select">
-                                    <option value="active" <?= $listing['status'] == 'active' ? 'selected' : '' ?>>Active (Visible)</option>
-                                    <option value="sold" <?= $listing['status'] == 'sold' ? 'selected' : '' ?>>Mark as Sold</option>
-                                    <option value="archived" <?= $listing['status'] == 'archived' ? 'selected' : '' ?>>Archived (Hidden)</option>
+                                    <option value="active" <?= $listing['status'] == 'active' ? 'selected' : '' ?>>Active</option>
+                                    <option value="sold" <?= $listing['status'] == 'sold' ? 'selected' : '' ?>>Sold</option>
+                                    <option value="archived" <?= $listing['status'] == 'archived' ? 'selected' : '' ?>>Archived</option>
                                 </select>
                             </div>
 
-                            <div class="col-12 pt-3">
-                                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold rounded-pill">
-                                    Save Changes
-                                </button>
+                            <div class="col-12 pt-3 border-top">
+                                <button type="submit" class="btn btn-primary px-5 fw-bold rounded-pill">Save Changes</button>
+                                <a href="my-listings.php" class="btn btn-link text-muted ms-2">Cancel</a>
                             </div>
                         </div>
                     </form>

@@ -1,6 +1,7 @@
 <?php
 /**
- * PwanDeal - Marketplace Browse
+ * PwanDeal - Marketplace View (Browse All)
+ * File: listings/view.php
  */
 session_start();
 require_once '../config/database.php';
@@ -9,7 +10,7 @@ require_once '../config/database.php';
 $category_filter = $_GET['category'] ?? '';
 $search_query = trim($_GET['search'] ?? '');
 $min_price = !empty($_GET['min_price']) ? (float)$_GET['min_price'] : 0;
-// Using a large number as default max, but handling it cleanly in UI
+// Default max price set high
 $max_price = !empty($_GET['max_price']) ? (float)$_GET['max_price'] : 2000000; 
 
 $page = max(1, (int)($_GET['page'] ?? 1));
@@ -37,7 +38,7 @@ if ($min_price > 0) {
     $params[] = $min_price;
     $types .= 'd';
 }
-if (!empty($_GET['max_price'])) { // Only filter max if user actually typed it
+if (!empty($_GET['max_price'])) { 
     $where .= " AND l.price <= ?";
     $params[] = $max_price;
     $types .= 'd';
@@ -50,7 +51,7 @@ $count_stmt->execute();
 $total_listings = $count_stmt->get_result()->fetch_assoc()['total'];
 $total_pages = ceil($total_listings / $limit);
 
-// 4. Fetch Results
+// 4. Fetch Results (JOINing images table for the primary photo)
 $sql = "SELECT l.*, c.name as category_name, u.name as provider_name, u.profile_photo, i.image_url 
         FROM listings l 
         JOIN categories c ON l.category_id = c.category_id 
@@ -83,13 +84,13 @@ include '../includes/header.php';
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="fw-bold mb-0">Filters</h5>
-                        <a href="browse.php" class="small text-decoration-none">Clear</a>
+                        <a href="view.php" class="small text-decoration-none">Clear</a>
                     </div>
                     
-                    <form method="GET" action="browse.php">
+                    <form method="GET" action="view.php">
                         <input type="hidden" name="search" value="<?= htmlspecialchars($search_query) ?>">
 
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label class="small fw-bold text-muted mb-2 text-uppercase">Category</label>
                             <select name="category" class="form-select bg-light border-0 shadow-none">
                                 <option value="">All Categories</option>
@@ -115,7 +116,7 @@ include '../includes/header.php';
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm">
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm py-2">
                             Apply Filters
                         </button>
                     </form>
@@ -124,22 +125,15 @@ include '../includes/header.php';
         </div>
 
         <div class="col-lg-9">
-            <form method="GET" action="browse.php" class="mb-4">
+            <form method="GET" action="view.php" class="mb-4">
                 <div class="input-group shadow-sm rounded-pill overflow-hidden bg-white p-1">
                     <input type="text" name="search" class="form-control border-0 px-4 shadow-none" 
-                           placeholder="Search for hostells, tutors, or clothes..." value="<?= htmlspecialchars($search_query) ?>">
+                           placeholder="Search..." value="<?= htmlspecialchars($search_query) ?>">
                     <button class="btn btn-primary rounded-pill px-4" type="submit">
                         <i class="bi bi-search"></i>
                     </button>
                 </div>
             </form>
-
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="fw-bold mb-0">
-                    <?= $search_query ? 'Results for "' . htmlspecialchars($search_query) . '"' : 'Featured Services' ?>
-                </h4>
-                <small class="text-muted"><?= $total_listings ?> listings found</small>
-            </div>
 
             <div class="row g-4">
                 <?php if ($listings->num_rows > 0): ?>
@@ -157,17 +151,11 @@ include '../includes/header.php';
                                         </div>
                                     </div>
                                     <div class="card-body p-3">
-                                        <div class="d-flex justify-content-between align-items-start mb-1">
-                                            <span class="text-primary small fw-bold text-uppercase"><?= htmlspecialchars($row['category_name']) ?></span>
-                                        </div>
                                         <h6 class="fw-bold text-truncate mb-2"><?= htmlspecialchars($row['title']) ?></h6>
-                                        <p class="text-muted small text-truncate-2 mb-3">
-                                            <?= htmlspecialchars($row['description']) ?>
-                                        </p>
-                                        <hr class="opacity-10 my-2">
-                                        <div class="d-flex align-items-center">
+                                        <p class="text-muted small mb-3 text-truncate-2"><?= htmlspecialchars($row['description']) ?></p>
+                                        <div class="d-flex align-items-center border-top pt-2">
                                             <img src="<?= !empty($row['profile_photo']) ? '../uploads/profiles/'.$row['profile_photo'] : '../assets/img/default-avatar.png' ?>" 
-                                                 class="rounded-circle me-2" width="24" height="24" style="object-fit: cover;">
+                                                 class="rounded-circle me-2" width="24" height="24">
                                             <span class="small text-secondary"><?= htmlspecialchars($row['provider_name']) ?></span>
                                         </div>
                                     </div>
@@ -175,53 +163,14 @@ include '../includes/header.php';
                             </div>
                         </div>
                     <?php endwhile; ?>
-
-                    <?php if ($total_pages > 1): ?>
-                        <div class="col-12 mt-5">
-                            <nav>
-                                <ul class="pagination justify-content-center gap-2">
-                                    <?php for ($i = 1; $i <= $total_pages; $i++): 
-                                        $url_params = http_build_query([
-                                            'page' => $i,
-                                            'search' => $search_query,
-                                            'category' => $category_filter,
-                                            'min_price' => $min_price,
-                                            'max_price' => $_GET['max_price'] ?? ''
-                                        ]);
-                                    ?>
-                                        <li class="page-item">
-                                            <a class="page-link rounded-circle border-0 d-flex align-items-center justify-content-center shadow-sm <?= ($i == $page) ? 'bg-primary text-white' : 'bg-white text-dark' ?>" 
-                                               style="width: 40px; height: 40px;" href="?<?= $url_params ?>">
-                                                <?= $i ?>
-                                            </a>
-                                        </li>
-                                    <?php endfor; ?>
-                                </ul>
-                            </nav>
-                        </div>
-                    <?php endif; ?>
-
                 <?php else: ?>
                     <div class="col-12 text-center py-5">
-                        <h2 class="display-1 text-light opacity-50"><i class="bi bi-search"></i></h2>
-                        <h4 class="text-muted">No deals found for this search.</h4>
-                        <a href="browse.php" class="btn btn-outline-primary rounded-pill mt-3 px-4">See All Listings</a>
+                        <h4 class="text-muted">No listings found.</h4>
                     </div>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
-
-<style>
-    .listing-card { transition: all 0.3s cubic-bezier(.25,.8,.25,1); }
-    .listing-card:hover { transform: translateY(-8px); box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important; }
-    .text-truncate-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-</style>
 
 <?php include '../includes/footer.php'; ?>

@@ -14,7 +14,6 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 
 // 2. Fetch Conversations
-// This query groups messages by user to show unique threads
 $sql = "SELECT 
             u.user_id, u.name, u.profile_photo,
             MAX(m.created_at) as last_message_time,
@@ -45,11 +44,21 @@ function formatInboxTime($datetime) {
 }
 ?>
 
+<style>
+    /* Custom styles for a more "app-like" feel */
+    .inbox-card { transition: all 0.2s ease; border-bottom: 1px solid #f0f0f0 !important; }
+    .inbox-card:hover { background-color: #f8f9fa !important; transform: translateX(4px); }
+    .unread-dot { width: 12px; height: 12px; border: 2px solid #fff; }
+</style>
+
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-8">
             
-            <h2 class="fw-bold mb-4">Messages</h2>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold mb-0">Messages</h2>
+                <span class="badge bg-light text-dark border rounded-pill px-3"><?= $conversations->num_rows ?> Threads</span>
+            </div>
 
             <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
                 <div class="card-body p-0">
@@ -59,23 +68,25 @@ function formatInboxTime($datetime) {
                                 $is_unread = ($conv['unread_count'] > 0);
                             ?>
                                 <a href="chat.php?user=<?= $conv['user_id'] ?>" 
-                                   class="list-group-item list-group-item-action p-4 border-0 border-bottom <?= $is_unread ? 'bg-light' : '' ?>">
+                                   class="list-group-item list-group-item-action p-4 inbox-card border-0 <?= $is_unread ? 'bg-aliceblue' : '' ?>">
                                     <div class="d-flex align-items-center">
                                         
                                         <div class="position-relative">
                                             <img src="<?= !empty($conv['profile_photo']) ? '../uploads/profiles/'.$conv['profile_photo'] : '../assets/img/default-avatar.png' ?>" 
                                                  class="rounded-circle shadow-sm" style="width: 55px; height: 55px; object-fit: cover;">
                                             <?php if ($is_unread): ?>
-                                                <span class="position-absolute top-0 start-100 translate-middle p-2 bg-primary border border-2 border-white rounded-circle"></span>
+                                                <span class="position-absolute top-0 start-100 translate-middle p-2 bg-primary unread-dot rounded-circle shadow-sm"></span>
                                             <?php endif; ?>
                                         </div>
 
-                                        <div class="ms-3 flex-grow-1">
-                                            <div class="d-flex justify-content-between">
-                                                <h6 class="mb-0 fw-bold"><?= htmlspecialchars($conv['name']) ?></h6>
-                                                <small class="text-muted"><?= formatInboxTime($conv['last_message_time']) ?></small>
+                                        <div class="ms-3 flex-grow-1 overflow-hidden">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <h6 class="mb-0 <?= $is_unread ? 'fw-bold text-dark' : 'text-secondary' ?>"><?= htmlspecialchars($conv['name']) ?></h6>
+                                                <small class="<?= $is_unread ? 'text-primary fw-bold' : 'text-muted' ?>">
+                                                    <?= formatInboxTime($conv['last_message_time']) ?>
+                                                </small>
                                             </div>
-                                            <p class="mb-0 text-muted text-truncate small" style="max-width: 300px;">
+                                            <p class="mb-0 text-truncate small <?= $is_unread ? 'text-dark fw-medium' : 'text-muted' ?>">
                                                 <?= htmlspecialchars($conv['last_msg'] ?? 'Start a conversation') ?>
                                             </p>
                                         </div>
@@ -86,8 +97,11 @@ function formatInboxTime($datetime) {
                         </div>
                     <?php else: ?>
                         <div class="text-center py-5">
-                            <i class="bi bi-chat-left-dots display-1 text-light"></i>
-                            <p class="mt-3 text-muted">No messages yet.</p>
+                            <div class="mb-3">
+                                <i class="bi bi-chat-dots display-1 text-light"></i>
+                            </div>
+                            <h5 class="text-secondary">Your inbox is empty</h5>
+                            <p class="text-muted mb-4">Messages from service providers will appear here.</p>
                             <a href="../listings/browse.php" class="btn btn-primary rounded-pill px-4">Find a Service</a>
                         </div>
                     <?php endif; ?>

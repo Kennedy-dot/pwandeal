@@ -5,7 +5,7 @@
 session_start();
 require_once '../config/database.php';
 
-// 1. Auth Check
+// 1. Auth & Input Validation
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit();
@@ -14,16 +14,16 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $review_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// 2. CSRF & Security Check
-// Pro Tip: In a real app, use a CSRF token. For now, we ensure ownership.
+// 2. Verify ownership & Fetch Provider ID
+// We must get to_user_id BEFORE we delete the row to know whose stats to update
 $stmt = $conn->prepare("SELECT to_user_id FROM reviews WHERE review_id = ? AND from_user_id = ?");
 $stmt->bind_param("ii", $review_id, $user_id);
 $stmt->execute();
 $review = $stmt->get_result()->fetch_assoc();
 
 if (!$review) {
-    // If review doesn't exist or doesn't belong to the user
-    header("Location: ../index.php?error=unauthorized");
+    // If review doesn't exist or doesn't belong to the user, redirect with error
+    header("Location: ../listings/view.php?error=unauthorized");
     exit();
 }
 
@@ -33,13 +33,14 @@ $provider_id = $review['to_user_id'];
 $conn->begin_transaction();
 
 try {
-    // Delete the specific review
+    // A. Delete the specific review
     $del = $conn->prepare("DELETE FROM reviews WHERE review_id = ?");
     $del->bind_param("i", $review_id);
     $del->execute();
 
-    /** * Recalculate stats
-     * Using IFNULL ensures that if the count is 0, the average is 0, not NULL.
+    /** * B. Recalculate provider stats
+     * IFNULL is crucial: if it was the user's only review, 
+     * AVG() returns NULL, but we want it to show 0 on their profile.
      */
     $upd = $conn->prepare("
         UPDATE users SET 
@@ -52,10 +53,11 @@ try {
 
     $conn->commit();
     
-    // Redirect back to the provider's profile with a specific success flag
+    // Redirect back to the provider's profile with a success flag
     header("Location: ../profile/view.php?id=" . $provider_id . "&success=review_deleted");
 } catch (Exception $e) {
     $conn->rollback();
+    // Log error for debugging if needed: error_log($e->getMessage());
     header("Location: ../profile/view.php?id=" . $provider_id . "&error=delete_failed");
 }
 exit();

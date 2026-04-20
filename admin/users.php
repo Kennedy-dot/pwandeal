@@ -84,17 +84,20 @@ include __DIR__ . '/../includes/header.php';
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <div>
             <h2 class="fw-bold mb-1" style="color: #1e2761;">👥 User Management</h2>
-            <p class="text-muted small mb-0">Platform governance and account moderation</p>
+            <p class="text-muted small mb-0">Monitor accounts, verify students, and handle governance</p>
         </div>
-        <form class="d-flex gap-2" method="GET">
-            <div class="input-group input-group-sm">
-                <input type="text" name="search" class="form-control rounded-start-pill ps-3" placeholder="Search name or email..." value="<?= htmlspecialchars($search) ?>">
-                <button class="btn btn-primary rounded-end-pill px-3" type="submit"><i class="bi bi-search"></i></button>
-            </div>
-            <?php if($search): ?>
-                <a href="/pwandeal/admin/users.php" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Clear</a>
-            <?php endif; ?>
-        </form>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="badge bg-primary rounded-pill px-3 py-2 shadow-sm me-2">Total: <?= number_format($total) ?></span>
+            <form class="d-flex gap-2" method="GET">
+                <div class="input-group input-group-sm">
+                    <input type="text" name="search" class="form-control rounded-start-pill ps-3" placeholder="Name or email..." value="<?= htmlspecialchars($search) ?>">
+                    <button class="btn btn-primary rounded-end-pill px-3" type="submit"><i class="bi bi-search"></i></button>
+                </div>
+                <?php if($search): ?>
+                    <a href="/pwandeal/admin/users.php" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Clear</a>
+                <?php endif; ?>
+            </form>
+        </div>
     </div>
 
     <?php if (isset($_GET['msg']) && $_GET['msg'] === 'success'): ?>
@@ -111,7 +114,7 @@ include __DIR__ . '/../includes/header.php';
                     <thead class="bg-light">
                         <tr>
                             <th class="ps-4 py-3 border-0">User</th>
-                            <th class="py-3 border-0">Details</th>
+                            <th class="py-3 border-0">School / Joined</th>
                             <th class="py-3 border-0">Status</th>
                             <th class="py-3 border-0">Rating</th>
                             <th class="text-end pe-4 py-3 border-0">Actions</th>
@@ -123,11 +126,11 @@ include __DIR__ . '/../includes/header.php';
                                 <tr>
                                     <td class="ps-4">
                                         <div class="fw-bold text-dark"><?= htmlspecialchars($u['name']) ?></div>
-                                        <div class="text-muted small"><?= htmlspecialchars($u['email']) ?></div>
+                                        <div class="text-muted small">#<?= $u['user_id'] ?> | <?= htmlspecialchars($u['email']) ?></div>
                                     </td>
                                     <td>
-                                        <div class="small text-muted"><i class="bi bi-mortarboard me-1"></i><?= htmlspecialchars($u['school'] ?? 'No School') ?></div>
-                                        <div class="small text-muted"><i class="bi bi-calendar-event me-1"></i>Joined <?= date('M Y', strtotime($u['created_at'])) ?></div>
+                                        <div class="small text-muted text-truncate" style="max-width: 150px;"><i class="bi bi-mortarboard me-1"></i><?= htmlspecialchars($u['school'] ?? 'N/A') ?></div>
+                                        <div class="small text-muted"><i class="bi bi-calendar-event me-1"></i><?= date('M d, Y', strtotime($u['created_at'])) ?></div>
                                     </td>
                                     <td>
                                         <?php if ($u['is_suspended']): ?>
@@ -144,7 +147,7 @@ include __DIR__ . '/../includes/header.php';
                                     </td>
                                     <td class="text-end pe-4">
                                         <div class="btn-group shadow-sm">
-                                            <a href="/pwandeal/profile/view.php?id=<?= $u['user_id'] ?>" class="btn btn-sm btn-white border">View</a>
+                                            <a href="/pwandeal/profile/view.php?id=<?= $u['user_id'] ?>" class="btn btn-sm btn-white border">Profile</a>
                                             
                                             <?php if ($u['user_id'] !== 1): ?>
                                                 <?php if ($u['is_suspended']): ?>
@@ -165,25 +168,25 @@ include __DIR__ . '/../includes/header.php';
                                 <?php if (!$u['is_suspended'] && $u['user_id'] !== 1): ?>
                                 <div class="modal fade" id="suspendModal<?= $u['user_id'] ?>" tabindex="-1">
                                     <div class="modal-dialog modal-dialog-centered">
-                                        <div class="modal-content border-0 shadow rounded-4">
-                                            <div class="modal-header border-0">
-                                                <h5 class="fw-bold text-danger mb-0">Restriction Action</h5>
+                                        <div class="modal-content border-0 shadow-lg rounded-4">
+                                            <div class="modal-header border-0 pb-0">
+                                                <h5 class="fw-bold text-danger mb-0">Suspend Account</h5>
                                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                             </div>
                                             <form method="POST">
-                                                <div class="modal-body pt-0">
-                                                    <p class="text-muted small">Suspending <strong><?= htmlspecialchars($u['name']) ?></strong> will immediately revoke their access to PwanDeal.</p>
+                                                <div class="modal-body">
+                                                    <p class="text-muted small">Suspending <strong><?= htmlspecialchars($u['name']) ?></strong> will immediately revoke their access. They will be unable to log in until unsuspended.</p>
                                                     <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                                                     <input type="hidden" name="action" value="suspend">
                                                     <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>">
                                                     <div class="mb-3">
                                                         <label class="form-label small fw-bold text-uppercase text-muted">Reason for suspension</label>
-                                                        <textarea name="reason" class="form-control bg-light border-0" rows="3" placeholder="Scamming, Harassment, etc." required></textarea>
+                                                        <textarea name="reason" class="form-control bg-light" rows="3" placeholder="Scamming, Harassment, etc." required></textarea>
                                                     </div>
                                                 </div>
-                                                <div class="modal-footer border-0">
+                                                <div class="modal-footer border-0 pt-0">
                                                     <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                                                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold">Confirm</button>
+                                                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold">Confirm Suspension</button>
                                                 </div>
                                             </form>
                                         </div>
@@ -205,22 +208,36 @@ include __DIR__ . '/../includes/header.php';
         <nav class="mt-4">
             <ul class="pagination justify-content-center">
                 <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                    <a class="page-link border-0 shadow-sm mx-1 rounded" href="?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?>">Prev</a>
+                    <a class="page-link border-0 shadow-sm mx-1 rounded" href="?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?>">Previous</a>
                 </li>
-                <li class="page-item active"><span class="page-link border-0 shadow-sm mx-1 rounded"><?= $page ?> of <?= $total_pages ?></span></li>
+                <?php 
+                $start = max(1, $page - 2);
+                $end = min($total_pages, $page + 2);
+                for ($i = $start; $i <= $end; $i++): ?>
+                    <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
+                        <a class="page-link border-0 shadow-sm mx-1 rounded" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>"><?= $i ?></a>
+                    </li>
+                <?php endfor; ?>
                 <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
                     <a class="page-link border-0 shadow-sm mx-1 rounded" href="?page=<?= $page + 1 ?>&search=<?= urlencode($search) ?>">Next</a>
                 </li>
             </ul>
         </nav>
     <?php endif; ?>
+
+    <div class="mt-4">
+        <a href="/pwandeal/admin/dashboard.php" class="btn btn-link text-decoration-none text-muted p-0">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
 </div>
 
 <style>
     .btn-white { background: #fff; color: #6c757d; }
     .btn-white:hover { background: #f8f9fa; color: #1e2761; }
     .table-hover tbody tr:hover { background-color: rgba(30, 39, 97, 0.02); }
-    .page-item.active .page-link { background-color: #1e2761; border-color: #1e2761; }
+    .page-item.active .page-link { background-color: #1e2761; border-color: #1e2761; color: white; }
+    .page-link { color: #1e2761; }
 </style>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -19,7 +19,6 @@ $limit = 10;
 $offset = ($page - 1) * $limit;
 
 // 1. Fetch Summary Stats & User Info
-// Using COALESCE to ensure we show 0.0 instead of null for new users
 $user_stmt = $conn->prepare("
     SELECT name, profile_photo, 
            COALESCE(average_rating, 0) as average_rating, 
@@ -33,7 +32,7 @@ $user = $user_stmt->get_result()->fetch_assoc();
 $total_reviews = $user['total_reviews'];
 $total_pages = ceil($total_reviews / $limit);
 
-// 2. Fetch Paginated Reviews
+// 2. Fetch Paginated Reviews with Join on Reviewer and Listing
 $sql = "SELECT r.*, u.name as reviewer_name, u.profile_photo as reviewer_photo, l.title as listing_title
         FROM reviews r
         LEFT JOIN users u ON r.from_user_id = u.user_id
@@ -48,7 +47,6 @@ $stmt->execute();
 $reviews = $stmt->get_result();
 
 $page_title = 'My Feedback';
-$base_url = '..';
 include '../includes/header.php';
 ?>
 
@@ -59,12 +57,10 @@ include '../includes/header.php';
                 <div class="card-body p-4 p-lg-5">
                     <div class="row align-items-center">
                         <div class="col-md-auto text-center mb-4 mb-md-0">
-                            <div class="position-relative d-inline-block">
-                                <div class="rating-circle">
-                                    <h1 class="fw-bold mb-0"><?= number_format($user['average_rating'], 1) ?></h1>
-                                    <div class="text-warning">
-                                        <i class="bi bi-star-fill"></i>
-                                    </div>
+                            <div class="rating-circle mx-auto">
+                                <h1 class="fw-bold mb-0 text-dark"><?= number_format($user['average_rating'], 1) ?></h1>
+                                <div class="text-warning">
+                                    <i class="bi bi-star-fill"></i>
                                 </div>
                             </div>
                         </div>
@@ -112,8 +108,8 @@ include '../includes/header.php';
                                     <img src="<?= !empty($row['reviewer_photo']) ? '../uploads/profiles/'.$row['reviewer_photo'] : '../assets/img/default-avatar.png' ?>" 
                                          class="rounded-circle me-3 border" style="width: 48px; height: 48px; object-fit: cover;">
                                     <div>
-                                        <h6 class="fw-bold mb-0 text-dark"><?= htmlspecialchars($row['reviewer_name'] ?? 'Anonymous') ?></h6>
-                                        <small class="text-muted"><?= date('F j, Y', strtotime($row['created_at'])) ?></small>
+                                        <h6 class="fw-bold mb-0 text-dark"><?= htmlspecialchars($row['reviewer_name'] ?? 'Anonymous Student') ?></h6>
+                                        <small class="text-muted"><?= date('M j, Y', strtotime($row['created_at'])) ?></small>
                                     </div>
                                 </div>
                                 <div class="text-warning">
@@ -122,12 +118,12 @@ include '../includes/header.php';
                             </div>
                             
                             <h6 class="fw-bold text-dark mb-2"><?= htmlspecialchars($row['title']) ?></h6>
-                            <p class="text-secondary mb-3 italic">"<?= htmlspecialchars($row['comment']) ?>"</p>
+                            <p class="text-secondary mb-3" style="font-style: italic;">"<?= htmlspecialchars($row['comment']) ?>"</p>
                             
                             <?php if ($row['listing_title']): ?>
                                 <div class="bg-light px-3 py-2 rounded-pill d-inline-block">
                                     <small class="text-muted">
-                                        <i class="bi bi-cart-check me-1"></i> For: <span class="text-dark fw-medium"><?= htmlspecialchars($row['listing_title']) ?></span>
+                                        <i class="bi bi-cart-check me-1"></i> Item: <span class="text-dark fw-medium"><?= htmlspecialchars($row['listing_title']) ?></span>
                                     </small>
                                 </div>
                             <?php endif; ?>
@@ -137,11 +133,11 @@ include '../includes/header.php';
 
                 <?php if ($total_pages > 1): ?>
                     <nav class="mt-5">
-                        <ul class="pagination justify-content-center">
+                        <ul class="pagination justify-content-center gap-2">
                             <?php for ($i = 1; $i <= $total_pages; $i++): ?>
                                 <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                                    <a class="page-link border-0 shadow-sm mx-1 rounded-circle text-center" 
-                                       style="width: 40px; height: 40px; line-height: 24px;" 
+                                    <a class="page-link border-0 shadow-sm rounded-circle d-flex align-items-center justify-content-center" 
+                                       style="width: 40px; height: 40px;" 
                                        href="?page=<?= $i ?>"><?= $i ?></a>
                                 </li>
                             <?php endfor; ?>
@@ -150,10 +146,10 @@ include '../includes/header.php';
                 <?php endif; ?>
 
             <?php else: ?>
-                <div class="text-center py-5 bg-white rounded-4 shadow-sm">
-                    <img src="../assets/img/empty-reviews.svg" class="img-fluid mb-3" style="max-width: 150px; opacity: 0.5;">
-                    <h5 class="text-muted">No feedback received yet</h5>
-                    <p class="small text-muted px-4">Complete your first deal and ask the buyer for a review!</p>
+                <div class="text-center py-5 bg-white rounded-4 shadow-sm border">
+                    <div class="display-1 text-muted mb-3"><i class="bi bi-star"></i></div>
+                    <h5 class="text-dark fw-bold">No feedback yet</h5>
+                    <p class="text-muted small px-4">Transactions you complete will appear here once rated.</p>
                 </div>
             <?php endif; ?>
         </div>
@@ -162,35 +158,35 @@ include '../includes/header.php';
             <div class="sticky-top" style="top: 100px;">
                 <div class="card border-0 rounded-4 shadow-sm mb-4 overflow-hidden">
                     <div class="card-header bg-dark text-white border-0 py-3">
-                        <h6 class="fw-bold mb-0"><i class="bi bi-lightning-charge me-2"></i>Improve Your Score</h6>
+                        <h6 class="fw-bold mb-0"><i class="bi bi-lightning-charge me-2 text-warning"></i>Boost Your Rating</h6>
                     </div>
                     <div class="card-body p-4">
                         <div class="d-flex mb-4">
-                            <div class="me-3"><i class="bi bi-clock-history fs-4 text-primary"></i></div>
+                            <div class="me-3 text-primary"><i class="bi bi-clock-history fs-4"></i></div>
                             <div>
-                                <h6 class="fw-bold mb-1 small">Reply Faster</h6>
-                                <p class="text-muted x-small mb-0">Students appreciate quick responses to their inquiries.</p>
+                                <h6 class="fw-bold mb-1 small">Speed Matters</h6>
+                                <p class="text-muted x-small mb-0">Replying within 30 minutes significantly increases trust.</p>
                             </div>
                         </div>
                         <div class="d-flex mb-4">
-                            <div class="me-3"><i class="bi bi-camera fs-4 text-primary"></i></div>
+                            <div class="me-3 text-primary"><i class="bi bi-camera fs-4"></i></div>
                             <div>
-                                <h6 class="fw-bold mb-1 small">Clear Images</h6>
-                                <p class="text-muted x-small mb-0">Listings with multiple high-quality photos get better feedback.</p>
+                                <h6 class="fw-bold mb-1 small">Honest Photos</h6>
+                                <p class="text-muted x-small mb-0">Show flaws clearly to avoid 1-star disappointment.</p>
                             </div>
                         </div>
                         <div class="d-flex">
-                            <div class="me-3"><i class="bi bi-heart fs-4 text-primary"></i></div>
+                            <div class="me-3 text-primary"><i class="bi bi-heart fs-4"></i></div>
                             <div>
-                                <h6 class="fw-bold mb-1 small">Friendly Service</h6>
-                                <p class="text-muted x-small mb-0">A positive attitude often leads to a 5-star review.</p>
+                                <h6 class="fw-bold mb-1 small">Be Polite</h6>
+                                <p class="text-muted x-small mb-0">Pwani students value respect as much as the price.</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <a href="../listings/create.php" class="btn btn-primary w-100 rounded-pill py-3 fw-bold shadow-sm">
-                    Post a New Service
+                <a href="../listings/create.php" class="btn btn-primary w-100 rounded-pill py-3 fw-bold shadow-sm" style="background-color: #028090; border: none;">
+                    Create New Listing
                 </a>
             </div>
         </div>
@@ -199,20 +195,35 @@ include '../includes/header.php';
 
 <style>
     .rating-circle {
-        width: 120px;
-        height: 120px;
-        background: #f8f9fa;
-        border: 4px solid #028090;
+        width: 110px;
+        height: 110px;
+        background: #fff;
+        border: 5px solid #028090;
         border-radius: 50%;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
+        box-shadow: 0 4px 15px rgba(2, 128, 144, 0.1);
     }
-    .review-card { transition: transform 0.2s; }
-    .review-card:hover { transform: translateX(5px); }
-    .page-link { color: #028090; font-weight: bold; }
-    .page-item.active .page-link { background-color: #028090; border-color: #028090; }
+    .review-card { 
+        transition: transform 0.2s, box-shadow 0.2s; 
+        border: 1px solid rgba(0,0,0,0.05) !important;
+    }
+    .review-card:hover { 
+        transform: translateY(-3px); 
+        box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
+    }
+    .page-link { 
+        color: #028090; 
+        font-weight: bold; 
+        transition: 0.3s;
+    }
+    .page-item.active .page-link { 
+        background-color: #028090; 
+        border-color: #028090; 
+        color: white;
+    }
     .x-small { font-size: 0.75rem; }
 </style>
 

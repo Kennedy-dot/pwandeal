@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $conn->commit();
             $success = 'Your feedback has been updated.';
             
-            // Update local variable for display
+            // Update local variables for display
             $review['rating'] = $rating;
             $review['title'] = $title;
             $review['comment'] = $comment;

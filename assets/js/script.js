@@ -39,12 +39,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 3. Auto-Dismiss Alerts (Bootstrap 5)
+    // 3. Auto-Dismiss Alerts (Bootstrap 5 Compatible)
     const alerts = document.querySelectorAll('.alert-dismissible:not(.alert-permanent)');
     alerts.forEach(alert => {
         setTimeout(() => {
-            const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
-            if (bsAlert) bsAlert.close();
+            if (typeof bootstrap !== 'undefined') {
+                const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
+                if (bsAlert) bsAlert.close();
+            } else {
+                alert.remove(); // Fallback if bootstrap JS isn't loaded
+            }
         }, 5000);
     });
 
@@ -57,7 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (counter) {
             area.addEventListener('input', () => {
                 counter.textContent = area.value.length;
-                // Add warning color if near limit
+                // Add warning color if near limit (90% capacity)
                 if (area.value.length >= (area.maxLength * 0.9)) {
                     counter.classList.add('text-danger');
                 } else {
@@ -85,7 +89,7 @@ const formatPrice = (price) => {
  */
 const Validator = {
     email: (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
-    // Validates +254..., 07..., or 01...
+    // Validates +254..., 07..., or 01... (Kenyan standards)
     phone: (phone) => /^(?:\+254|0)[17]\d{8}$/.test(phone),
     password: (pass) => pass.length >= 8
 };
@@ -112,7 +116,7 @@ async function copyToClipboard(text, element) {
     try {
         await navigator.clipboard.writeText(text);
         const originalHTML = element.innerHTML;
-        element.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i>';
+        element.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> <small class="text-success">Copied!</small>';
         element.classList.add('active');
         
         setTimeout(() => { 

@@ -5,7 +5,7 @@
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-// 1. Auth Check
+// 1. Auth Check (Must happen before any HTML output)
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit();
@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $school = $_POST['school'] ?? '';
     $year_of_study = $_POST['year_of_study'] ?? '';
 
+    // Validation
     if (empty($name)) {
         $error = 'Name is required.';
     } elseif (strlen($bio) > 500) {
@@ -43,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (isset($_FILES['profile_photo']) && $_FILES['profile_photo']['error'] === UPLOAD_ERR_OK) {
             $file = $_FILES['profile_photo'];
-            $allowed = ['image/jpeg','image/jpg','image/png', 'image/webp'];
+            $allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
             $file_type = mime_content_type($file['tmp_name']);
             
             if (!in_array($file_type, $allowed)) {
@@ -95,16 +96,19 @@ include '../includes/header.php';
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-6">
             <nav aria-label="breadcrumb" class="mb-4">
-                <ol class="breadcrumb">
+                <ol class="breadcrumb small">
                     <li class="breadcrumb-item"><a href="dashboard.php" class="text-decoration-none">Dashboard</a></li>
                     <li class="breadcrumb-item active">Edit Profile</li>
                 </ol>
             </nav>
 
-            <div class="card border-0 shadow-sm rounded-4">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+                <div class="card-header text-center text-white py-4" style="background: linear-gradient(135deg, #028090, #1e2761);">
+                    <h3 class="fw-bold mb-0">Update Profile</h3>
+                    <p class="small opacity-75 mb-0">Customize how others see you on PwanDeal</p>
+                </div>
+                
                 <div class="card-body p-4 p-md-5">
-                    <h3 class="fw-bold text-dark mb-4">Edit Profile</h3>
-
                     <?php if ($error): ?>
                         <div class="alert alert-danger border-0 rounded-3 small py-2">
                              <i class="bi bi-exclamation-circle me-2"></i><?= htmlspecialchars($error) ?>
@@ -125,12 +129,13 @@ include '../includes/header.php';
                                 ?>
                                 <img src="<?= $photo_path ?>" 
                                      class="rounded-circle shadow-sm object-fit-cover border border-4 border-white" 
-                                     style="width: 120px; height: 120px;" id="preview">
-                                <label for="profile_photo" class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 35px; height: 35px; cursor: pointer; border: 3px solid #fff;">
+                                     style="width: 130px; height: 130px;" id="preview">
+                                <label for="profile_photo" class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; cursor: pointer; border: 3px solid #fff;">
                                     <i class="bi bi-camera-fill small"></i>
                                 </label>
                             </div>
                             <input type="file" id="profile_photo" name="profile_photo" class="d-none" accept="image/*" onchange="previewImage(this)">
+                            <p class="text-muted small mt-2">Click icon to change photo</p>
                         </div>
 
                         <div class="row g-3">
@@ -140,11 +145,19 @@ include '../includes/header.php';
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label fw-bold small text-muted text-uppercase">School</label>
+                                <label class="form-label fw-bold small text-muted text-uppercase">School/Faculty</label>
                                 <select class="form-select bg-light border-0" name="school">
                                     <option value="">Select School</option>
                                     <?php 
-                                    $schools = ["SED", "SPAS", "SHSS", "SBE", "SHHS", "SEES", "SASA"];
+                                    $schools = [
+                                        "School of Education (SED)",
+                                        "School of Pure & Applied Sciences (SPAS)",
+                                        "School of Humanities & Social Sciences (SHSS)",
+                                        "School of Business & Economics (SBE)",
+                                        "School of Health & Human Sciences (SHHS)",
+                                        "School of Environmental & Earth Sciences (SEES)",
+                                        "School of Ag. Sciences & Agribusiness (SASA)"
+                                    ];
                                     foreach($schools as $s): ?>
                                         <option value="<?= $s ?>" <?= $user['school'] === $s ? 'selected' : '' ?>><?= $s ?></option>
                                     <?php endforeach; ?>
@@ -152,7 +165,7 @@ include '../includes/header.php';
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label fw-bold small text-muted text-uppercase">Year</label>
+                                <label class="form-label fw-bold small text-muted text-uppercase">Year of Study</label>
                                 <select class="form-select bg-light border-0" name="year_of_study">
                                     <option value="">Select Year</option>
                                     <?php for($i=1; $i<=4; $i++): ?>
@@ -167,17 +180,17 @@ include '../includes/header.php';
                             </div>
 
                             <div class="col-12">
-                                <label class="form-label fw-bold small text-muted text-uppercase">About You</label>
-                                <textarea class="form-control bg-light border-0" name="bio" rows="3" maxlength="500"><?= htmlspecialchars($user['bio'] ?? '') ?></textarea>
-                                <div class="text-end mt-1" style="font-size: 0.7rem; color: #aaa;">
+                                <label class="form-label fw-bold small text-muted text-uppercase">About You (Bio)</label>
+                                <textarea class="form-control bg-light border-0" name="bio" rows="4" maxlength="500" placeholder="E.g. I provide professional hair braiding services near the Main Gate..."><?= htmlspecialchars($user['bio'] ?? '') ?></textarea>
+                                <div class="text-end mt-1" style="font-size: 0.75rem; color: #aaa;">
                                     <span id="char-count">0</span>/500 characters
                                 </div>
                             </div>
                         </div>
 
-                        <div class="mt-4">
-                            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold rounded-3 shadow-sm">Save Changes</button>
-                            <a href="dashboard.php" class="btn btn-link w-100 text-muted small mt-2">Back to Dashboard</a>
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm" style="background-color: #028090; border: none;">Save Changes</button>
+                            <a href="dashboard.php" class="btn btn-link text-decoration-none text-muted small">Discard Changes</a>
                         </div>
                     </form>
                 </div>
@@ -187,7 +200,7 @@ include '../includes/header.php';
 </div>
 
 <script>
-// UI: Preview image
+// Image preview before upload
 function previewImage(input) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
@@ -196,7 +209,7 @@ function previewImage(input) {
     }
 }
 
-// UI: Bio Counter
+// Real-time character counter
 const bioArea = document.querySelector('textarea[name="bio"]');
 const charCounter = document.getElementById('char-count');
 if(bioArea) {

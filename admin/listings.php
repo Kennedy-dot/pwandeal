@@ -128,51 +128,76 @@ include __DIR__ . '/../includes/header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while ($l = $result->fetch_assoc()): ?>
+                    <?php if ($result->num_rows > 0): ?>
+                        <?php while ($l = $result->fetch_assoc()): ?>
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold text-dark mb-0"><?= htmlspecialchars($l['title']) ?></div>
+                                    <div class="text-muted" style="font-size: 0.75rem;">ID: #<?= $l['listing_id'] ?> • <?= $l['cat'] ?></div>
+                                </td>
+                                <td>
+                                    <div class="small"><?= htmlspecialchars($l['provider']) ?></div>
+                                    <div class="text-muted" style="font-size: 0.7rem;"><?= date('d M Y', strtotime($l['created_at'])) ?></div>
+                                </td>
+                                <td class="fw-bold text-primary">KSh <?= number_format($l['price']) ?></td>
+                                <td class="text-center">
+                                    <span class="badge bg-light text-dark border fw-normal"><i class="bi bi-eye"></i> <?= number_format($l['views']) ?></span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="d-flex justify-content-end gap-1">
+                                        <a href="../listings/detail.php?id=<?= $l['listing_id'] ?>" class="btn btn-sm btn-light border" title="View"><i class="bi bi-eye"></i></a>
+                                        <form method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                                            <input type="hidden" name="listing_id" value="<?= $l['listing_id'] ?>">
+                                            
+                                            <?php if ($status === 'active'): ?>
+                                                <button name="action" value="hide" class="btn btn-sm btn-light border text-warning" title="Deactivate"><i class="bi bi-slash-circle"></i></button>
+                                                <button name="action" value="archive" class="btn btn-sm btn-light border text-info" title="Archive"><i class="bi bi-archive"></i></button>
+                                            <?php else: ?>
+                                                <button name="action" value="activate" class="btn btn-sm btn-light border text-success" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></button>
+                                            <?php endif; ?>
+                                            
+                                            <button name="action" value="delete" class="btn btn-sm btn-light border text-danger" onclick="return confirm('PERMANENTLY DELETE? This deletes all images and data.')" title="Nuke"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
+                    <?php else: ?>
                         <tr>
-                            <td class="ps-4">
-                                <div class="fw-bold text-dark mb-0"><?= htmlspecialchars($l['title']) ?></div>
-                                <div class="text-muted" style="font-size: 0.75rem;">ID: #<?= $l['listing_id'] ?> • <?= $l['cat'] ?></div>
-                            </td>
-                            <td>
-                                <div class="small"><?= htmlspecialchars($l['provider']) ?></div>
-                                <div class="text-muted" style="font-size: 0.7rem;"><?= date('d M Y', strtotime($l['created_at'])) ?></div>
-                            </td>
-                            <td class="fw-bold">KSh <?= number_format($l['price']) ?></td>
-                            <td class="text-center">
-                                <span class="badge bg-light text-dark border fw-normal"><?= $l['views'] ?> views</span>
-                            </td>
-                            <td class="text-end pe-4">
-                                <div class="d-flex justify-content-end gap-1">
-                                    <a href="../listings/detail.php?id=<?= $l['listing_id'] ?>" class="btn btn-sm btn-light border" title="View"><i class="bi bi-eye"></i></a>
-                                    <form method="POST" class="d-inline">
-                                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                                        <input type="hidden" name="listing_id" value="<?= $l['listing_id'] ?>">
-                                        
-                                        <?php if ($status === 'active'): ?>
-                                            <button name="action" value="hide" class="btn btn-sm btn-light border text-warning" title="Deactivate"><i class="bi bi-slash-circle"></i></button>
-                                            <button name="action" value="archive" class="btn btn-sm btn-light border text-info" title="Archive"><i class="bi bi-archive"></i></button>
-                                        <?php else: ?>
-                                            <button name="action" value="activate" class="btn btn-sm btn-light border text-success" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></button>
-                                        <?php endif; ?>
-                                        
-                                        <button name="action" value="delete" class="btn btn-sm btn-light border text-danger" onclick="return confirm('PERMANENTLY DELETE?')" title="Nuke"><i class="bi bi-trash"></i></button>
-                                    </form>
-                                </div>
-                            </td>
+                            <td colspan="5" class="text-center py-5 text-muted">No <?= $status ?> listings found.</td>
                         </tr>
-                    <?php endwhile; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
     </div>
-    
+
+    <?php if ($total_pages > 1): ?>
+        <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                    <li class="page-item <?= $i == $page ? 'active' : '' ?>">
+                        <a class="page-link shadow-sm border-0 mx-1 rounded" href="?status=<?= $status ?>&page=<?= $i ?>"><?= $i ?></a>
+                    </li>
+                <?php endfor; ?>
+            </ul>
+        </nav>
+    <?php endif; ?>
+
+    <div class="mt-4">
+        <a href="dashboard.php" class="btn btn-link text-decoration-none text-muted p-0">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
     </div>
+</div>
 
 <style>
     .table thead th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; font-weight: 700; border: none; }
     .table tbody td { border-bottom: 1px solid #f8f9fa; }
     .btn-light:hover { background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .page-link { color: #028090; }
+    .page-item.active .page-link { background-color: #028090; border-color: #028090; }
 </style>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

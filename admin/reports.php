@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 4. FETCH PENDING REPORTS (With added listing/user context)
+// 4. FETCH PENDING REPORTS (With listing/user context)
 $sql = "SELECT r.*, 
                u1.name as reporter_name, 
                u2.name as reported_user_name,
@@ -97,7 +97,7 @@ include __DIR__ . '/../includes/header.php';
                                         <span class="fw-bold text-dark"><?= htmlspecialchars($row['reporter_name']) ?></span>
                                     </td>
                                     <td>
-                                        <span class="badge rounded-pill <?= $row['report_type'] === 'user' ? 'bg-warning text-dark' : 'bg-info' ?> px-3">
+                                        <span class="badge rounded-pill <?= $row['report_type'] === 'user' ? 'bg-warning text-dark' : 'bg-info text-white' ?> px-3">
                                             <?= ucfirst($row['report_type']) ?>
                                         </span>
                                     </td>
@@ -148,6 +148,10 @@ include __DIR__ . '/../includes/header.php';
                                                     <div class="alert alert-info border-0 py-2 small">
                                                         <i class="bi bi-info-circle me-1"></i> Listing: <strong><?= htmlspecialchars($row['reported_listing_title'] ?? 'N/A') ?></strong>
                                                     </div>
+                                                <?php elseif($row['reported_user_name']): ?>
+                                                    <div class="alert alert-warning border-0 py-2 small">
+                                                        <i class="bi bi-person-circle me-1"></i> User: <strong><?= htmlspecialchars($row['reported_user_name']) ?></strong>
+                                                    </div>
                                                 <?php endif; ?>
                                             </div>
                                             <div class="modal-footer border-0 pt-0">
@@ -175,5 +179,10 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
+
+<style>
+    .table-hover tbody tr:hover { background-color: rgba(0,0,0,0.01); }
+    .badge { font-weight: 600; font-size: 0.75rem; }
+</style>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

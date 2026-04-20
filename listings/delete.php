@@ -1,6 +1,7 @@
 <?php
 /**
  * PwanDeal - Delete Service Listing
+ * Merged for Multi-Image Support and Secure File Cleanup
  */
 session_start();
 require_once __DIR__ . '/../config/database.php';
@@ -20,7 +21,7 @@ if ($listing_id === 0) {
 }
 
 // 2. Ownership Verification & Retrieve Images for Cleanup
-// We join listing_images to get all files associated with this listing
+// We join listing_images to get all files associated with this listing before we delete the records
 $stmt = $conn->prepare("
     SELECT l.listing_id, i.image_url 
     FROM listings l 
@@ -36,7 +37,7 @@ $listing_exists = false;
 
 while ($row = $result->fetch_assoc()) {
     $listing_exists = true;
-    if (!empty($row['image_url'])) {
+    if (!empty($row['image_url']) && $row['image_url'] !== 'service-placeholder.jpg') {
         $images_to_delete[] = $row['image_url'];
     }
 }
@@ -55,12 +56,13 @@ try {
     $del_img->bind_param("i", $listing_id);
     $del_img->execute();
 
-    // B. Delete the listing record
+    // B. Delete the main listing record
     $del_stmt = $conn->prepare("DELETE FROM listings WHERE listing_id = ? AND user_id = ?");
     $del_stmt->bind_param("ii", $listing_id, $user_id);
     $del_stmt->execute();
 
     // C. Update the user's total_listings count
+    // GREATEST(0, ...) prevents negative counts in case of sync issues
     $upd_stmt = $conn->prepare("UPDATE users SET total_listings = GREATEST(0, total_listings - 1) WHERE user_id = ?");
     $upd_stmt->bind_param("i", $user_id);
     $upd_stmt->execute();
@@ -68,11 +70,20 @@ try {
     // D. Commit DB changes
     $conn->commit();
 
-    // E. File Cleanup
+    // E. File Cleanup (Only happens if DB transaction succeeded)
     foreach ($images_to_delete as $filename) {
         $file_path = __DIR__ . "/../uploads/services/" . $filename;
+        
         if (file_exists($file_path)) {
-            @unlink($file_path);
+            // Safety: Double check that no other listing is sharing this specific image 
+            // (Useful if users re-use images across different posts)
+            $check_sharing = $conn->prepare("SELECT image_id FROM listing_images WHERE image_url = ? LIMIT 1");
+            $check_sharing->bind_param("s", $filename);
+            $check_sharing->execute();
+            
+            if ($check_sharing->get_result()->num_rows === 0) {
+                @unlink($file_path);
+            }
         }
     }
 
@@ -81,6 +92,7 @@ try {
 
 } catch (Exception $e) {
     $conn->rollback();
+    error_log("Delete Error: " . $e->getMessage());
     header('Location: my-listings.php?msg=DeleteError');
     exit();
 }

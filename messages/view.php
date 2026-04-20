@@ -6,6 +6,7 @@
 session_start();
 require_once '../config/database.php';
 
+// 1. Auth Guard
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit();
@@ -13,9 +14,10 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
-// SQL: Grouping messages into distinct conversations with the latest message text
+// 2. Fetch Conversations
+// This query groups by user to show unique conversation threads with the latest message text
 $sql = "SELECT 
-            u.user_id, u.name, u.profile_photo,
+            u.user_id, u.name, u.profile_photo, u.average_rating,
             MAX(m.created_at) as last_message_time,
             (SELECT message_text FROM messages 
              WHERE (sender_id = ? AND receiver_id = u.user_id) 
@@ -34,9 +36,6 @@ $stmt->bind_param('iiiiii', $user_id, $user_id, $user_id, $user_id, $user_id, $u
 $stmt->execute();
 $conversations = $stmt->get_result();
 
-$page_title = 'My Messages';
-include '../includes/header.php';
-
 // Helper function for nice dates
 function formatInboxTime($datetime) {
     $time = strtotime($datetime);
@@ -45,22 +44,40 @@ function formatInboxTime($datetime) {
     }
     return date('M d', $time);
 }
+
+$page_title = 'My Messages';
+include '../includes/header.php';
 ?>
+
+<style>
+    .bg-unread { background-color: #f0f8ff !important; }
+    .transition-all { transition: all 0.2s ease; }
+    .conv-item:hover {
+        background-color: #f8f9fa !important;
+        transform: translateX(5px);
+    }
+    .text-truncate-custom {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+</style>
 
 <div class="container py-5">
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-lg-9">
             
-            <div class="d-flex align-items-center justify-content-between mb-4">
-                <h2 class="fw-bold mb-0">Messages</h2>
-                <?php if ($conversations->num_rows > 0): ?>
-                    <span class="badge bg-light text-dark border rounded-pill px-3 py-2">
-                        <?= $conversations->num_rows ?> Threads
-                    </span>
-                <?php endif; ?>
-            </div>
-
             <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-primary py-4 border-0">
+                    <div class="d-flex justify-content-between align-items-center px-2">
+                        <h3 class="mb-0 text-white fw-bold">Inbox</h3>
+                        <span class="badge bg-white text-primary rounded-pill px-3">
+                            <?= $conversations->num_rows ?> Conversations
+                        </span>
+                    </div>
+                </div>
+
                 <div class="card-body p-0">
                     <?php if ($conversations->num_rows > 0): ?>
                         <div class="list-group list-group-flush">
@@ -68,38 +85,37 @@ function formatInboxTime($datetime) {
                                 $is_unread = ($conv['unread_count'] > 0);
                             ?>
                                 <a href="chat.php?user=<?= $conv['user_id'] ?>" 
-                                   class="list-group-item list-group-item-action p-4 border-0 border-bottom transition-all <?= $is_unread ? 'bg-aliceblue' : '' ?>">
+                                   class="list-group-item list-group-item-action p-4 border-0 border-bottom conv-item transition-all <?= $is_unread ? 'bg-unread' : '' ?>">
                                     <div class="d-flex align-items-center">
                                         
                                         <div class="position-relative">
                                             <img src="<?= !empty($conv['profile_photo']) ? '../uploads/profiles/'.$conv['profile_photo'] : '../assets/img/default-avatar.png' ?>" 
                                                  class="rounded-circle shadow-sm border border-2 border-white" 
-                                                 style="width: 55px; height: 55px; object-fit: cover;">
+                                                 style="width: 60px; height: 60px; object-fit: cover;">
                                             <?php if ($is_unread): ?>
-                                                <span class="position-absolute top-0 start-100 translate-middle p-2 bg-primary border border-2 border-white rounded-circle">
-                                                    <span class="visually-hidden">New Message</span>
+                                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-2 border-white">
+                                                    <?= $conv['unread_count'] ?>
                                                 </span>
                                             <?php endif; ?>
                                         </div>
 
-                                        <div class="ms-3 flex-grow-1 min-width-0">
-                                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                                <h6 class="mb-0 fw-bold <?= $is_unread ? 'text-primary' : 'text-dark' ?>">
+                                        <div class="ms-4 flex-grow-1 min-width-0">
+                                            <div class="d-flex justify-content-between align-items-baseline mb-1">
+                                                <h6 class="mb-0 fw-bold <?= $is_unread ? 'text-primary' : 'text-dark' ?> fs-5">
                                                     <?= htmlspecialchars($conv['name']) ?>
                                                 </h6>
-                                                <small class="<?= $is_unread ? 'fw-bold text-primary' : 'text-muted' ?>">
+                                                <small class="text-muted">
                                                     <?= formatInboxTime($conv['last_message_time']) ?>
                                                 </small>
                                             </div>
-                                            
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <p class="mb-0 text-truncate small <?= $is_unread ? 'fw-bold text-dark' : 'text-muted' ?>" style="max-width: 85%;">
-                                                    <?= htmlspecialchars($conv['last_msg'] ?? 'Tap to start chatting') ?>
-                                                </p>
-                                                <?php if ($is_unread): ?>
-                                                    <span class="badge bg-primary rounded-pill small"><?= $conv['unread_count'] ?></span>
-                                                <?php endif; ?>
-                                            </div>
+                                            <p class="mb-0 text-muted text-truncate-custom <?= $is_unread ? 'fw-bold text-dark' : '' ?>" style="max-width: 90%;">
+                                                <?= $is_unread ? '📩 ' : '' ?>
+                                                <?= htmlspecialchars($conv['last_msg'] ?? 'No messages yet') ?>
+                                            </p>
+                                        </div>
+
+                                        <div class="ms-3 text-light">
+                                            <i class="bi bi-chevron-right"></i>
                                         </div>
 
                                     </div>
@@ -109,11 +125,11 @@ function formatInboxTime($datetime) {
                     <?php else: ?>
                         <div class="text-center py-5 my-5">
                             <div class="mb-4">
-                                <i class="bi bi-chat-dots text-light display-1"></i>
+                                <span class="display-1 text-light opacity-50">💬</span>
                             </div>
-                            <h4 class="fw-bold">Your inbox is empty</h4>
-                            <p class="text-muted mb-4">When you contact providers about services, <br>your conversations will appear here.</p>
-                            <a href="../listings/browse.php" class="btn btn-primary rounded-pill px-4">Find Services</a>
+                            <h4 class="text-secondary fw-bold">No conversations yet</h4>
+                            <p class="text-muted px-4">Browse listings and contact a provider to start a deal!</p>
+                            <a href="../listings/browse.php" class="btn btn-primary rounded-pill px-4 mt-3">Browse Services</a>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -122,20 +138,5 @@ function formatInboxTime($datetime) {
         </div>
     </div>
 </div>
-
-<style>
-    .bg-aliceblue { background-color: #f0f8ff !important; }
-    .transition-all { transition: all 0.2s ease; }
-    .list-group-item-action:hover {
-        background-color: #f8f9fa !important;
-        transform: translateX(5px);
-    }
-    .text-truncate {
-        display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-</style>
 
 <?php include '../includes/footer.php'; ?>

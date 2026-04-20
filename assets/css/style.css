@@ -10,7 +10,7 @@
     --success: #27ae60;
     --info: #3498db;
     --warning: #f39c12;
-    --archived: #6c757d; /* Added for Archived status */
+    --archived: #6c757d;
     --light: #f8f9fa;
     --dark: #2c3e50;
     --white: #ffffff;
@@ -30,7 +30,7 @@ body {
     flex-direction: column;
     min-height: 100vh;
     font-family: 'Inter', -apple-system, sans-serif;
-    background-color: #f4f7f6; /* Slightly softer grey */
+    background-color: #f4f7f6; /* Softer local background */
     color: var(--dark);
 }
 
@@ -68,7 +68,7 @@ body {
 
 .table {
     border-collapse: separate;
-    border-spacing: 0 0.5rem; /* Creates a slight gap between rows */
+    border-spacing: 0 0.5rem; /* Gap between rows from local HEAD */
 }
 
 .table thead th {
@@ -90,7 +90,7 @@ body {
     transform: scale(1.002);
 }
 
-/* Soft Badge Variants */
+/* Soft Badge Variants for Moderation */
 .badge-soft-success { background: #dcfce7; color: #15803d; }
 .badge-soft-danger { background: #fee2e2; color: #b91c1c; }
 .badge-soft-warning { background: #fef9c3; color: #a16207; }
@@ -110,6 +110,11 @@ body {
 .card-hover:hover {
     transform: translateY(-5px);
     box-shadow: var(--shadow-md);
+}
+
+.profile-avatar-wrapper {
+    position: relative;
+    display: inline-block;
 }
 
 .profile-avatar-lg {
@@ -159,6 +164,12 @@ body {
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
+.chat-input-area {
+    background: var(--white);
+    padding: 1rem;
+    border-top: 1px solid #eee;
+}
+
 /* ========================================
    FORMS & BUTTONS
    ======================================== */
@@ -173,17 +184,31 @@ body {
 .form-control:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(2, 128, 144, 0.15);
+    outline: none;
 }
 
 .btn {
     border-radius: 10px;
     font-weight: 600;
-    padding: 0.5rem 1.2rem;
+    padding: 0.6rem 1.5rem;
     transition: var(--transition);
 }
 
-.btn-primary { background-color: var(--primary) !important; border: none; }
-.btn-secondary { background-color: var(--secondary) !important; border: none; }
+.btn-primary { 
+    background-color: var(--primary) !important; 
+    border: none; 
+}
+
+.btn-primary:hover {
+    background-color: #026d7a !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(2, 128, 144, 0.3);
+}
+
+.btn-secondary { 
+    background-color: var(--secondary) !important; 
+    border: none; 
+}
 
 .btn:active {
     transform: scale(0.96);
@@ -192,11 +217,17 @@ body {
 /* ========================================
    UTILITIES
    ======================================== */
+
 .text-gradient {
     background: linear-gradient(135deg, var(--primary), var(--secondary));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+}
+
+.sticky-sidebar {
+    position: sticky;
+    top: 90px;
 }
 
 .pagination .page-link {

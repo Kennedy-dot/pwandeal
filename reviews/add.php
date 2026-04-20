@@ -35,7 +35,7 @@ if (!$provider) {
 $error = '';
 $success = '';
 
-// Check if already reviewed for this specific listing (if listing provided)
+// Check if already reviewed for this specific listing
 if ($listing_id) {
     $check = $conn->prepare('SELECT review_id FROM reviews WHERE from_user_id = ? AND to_user_id = ? AND listing_id = ?');
     $check->bind_param('iii', $user_id, $to_user_id, $listing_id);
@@ -62,8 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $stmt->bind_param('iiiiss', $user_id, $to_user_id, $listing_id, $rating, $title, $comment);
             $stmt->execute();
 
-            // 2. Atomic Recalculation
-            // We update the users table with the new aggregate data immediately
+            // 2. Atomic Recalculation of Provider Stats
             $update = $conn->prepare('
                 UPDATE users u 
                 SET u.average_rating = (SELECT AVG(rating) FROM reviews WHERE to_user_id = ?),
@@ -77,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $success = 'Thank you! Your review has been posted.';
         } catch (Exception $e) {
             $conn->rollback();
-            $error = 'Database error. Please try again later.';
+            $error = 'Something went wrong. Please try again later.';
         }
     }
 }
@@ -97,13 +96,13 @@ include '../includes/header.php';
                             <div class="mb-3" style="font-size: 4rem;">🎉</div>
                             <h3 class="fw-bold text-dark">Review Posted!</h3>
                             <p class="text-muted">Your feedback helps fellow Pwani students make better choices.</p>
-                            <a href="../profile/view.php?id=<?= $to_user_id ?>" class="btn btn-primary rounded-pill px-4 mt-3 w-100 shadow-sm">View Provider Profile</a>
+                            <a href="../profile/view.php?id=<?= $to_user_id ?>" class="btn btn-primary rounded-pill px-4 mt-3 w-100 shadow-sm" style="background-color: #028090; border: none;">View Provider Profile</a>
                         </div>
                     <?php else: ?>
 
                         <div class="text-center mb-4">
-                            <h3 class="fw-bold mb-1">Rate Service</h3>
-                            <p class="text-muted small">Share your experience with the community</p>
+                            <h3 class="fw-bold mb-1">Rate Experience</h3>
+                            <p class="text-muted small">Share your thoughts with the community</p>
                         </div>
                         
                         <div class="d-flex align-items-center mb-4 p-3 bg-light rounded-4 border">
@@ -111,7 +110,7 @@ include '../includes/header.php';
                                  class="rounded-circle me-3 shadow-sm" style="width: 55px; height: 55px; object-fit: cover; border: 2px solid #fff;">
                             <div>
                                 <h6 class="fw-bold mb-0"><?= htmlspecialchars($provider['name']) ?></h6>
-                                <span class="badge bg-white text-primary border rounded-pill x-small">Service Provider</span>
+                                <span class="badge bg-white text-primary border rounded-pill" style="font-size: 0.7rem;">Service Provider</span>
                             </div>
                         </div>
 
@@ -134,17 +133,17 @@ include '../includes/header.php';
 
                             <div class="mb-3">
                                 <label class="form-label fw-bold small text-muted">TITLE (OPTIONAL)</label>
-                                <input type="text" name="title" class="form-control bg-light border-0 py-2" placeholder="Summary of your experience" value="<?= htmlspecialchars($_POST['title'] ?? '') ?>">
+                                <input type="text" name="title" class="form-control bg-light border-0 py-2 shadow-none" placeholder="Summary of your experience" value="<?= htmlspecialchars($_POST['title'] ?? '') ?>">
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label fw-bold small text-muted">DETAILED FEEDBACK</label>
-                                <textarea name="comment" id="comment" class="form-control bg-light border-0" rows="4" maxlength="500" required placeholder="How was the communication? Was the service as described?"><?= htmlspecialchars($_POST['comment'] ?? '') ?></textarea>
+                                <textarea name="comment" id="comment" class="form-control bg-light border-0 shadow-none" rows="4" maxlength="500" required placeholder="How was the communication? Was the service as described?"><?= htmlspecialchars($_POST['comment'] ?? '') ?></textarea>
                                 <div class="text-end small text-muted mt-1"><span id="char-count">0</span>/500</div>
                             </div>
 
                             <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill fw-bold shadow mt-3" style="background: linear-gradient(135deg, #028090, #00a896); border:none;">
-                                Submit Review
+                                Post Public Review
                             </button>
                             <a href="../profile/view.php?id=<?= $to_user_id ?>" class="btn btn-link w-100 text-muted small mt-2">Cancel</a>
                         </form>
@@ -157,7 +156,6 @@ include '../includes/header.php';
 </div>
 
 <style>
-    /* Premium Star Rating CSS */
     .star-rating { border: none; }
     .star-label {
         font-size: 2.5rem;
@@ -165,15 +163,12 @@ include '../includes/header.php';
         transition: all 0.2s ease-in-out;
         cursor: pointer;
     }
-    /* Magic: Highlight all stars to the left of the hovered/checked star */
     .star-rating input:checked ~ .star-label,
     .star-rating .star-label:hover,
     .star-rating .star-label:hover ~ .star-label {
         color: #ffc107;
     }
     .star-rating .star-label:active { transform: scale(0.9); }
-    
-    .x-small { font-size: 0.7rem; }
 </style>
 
 <script>

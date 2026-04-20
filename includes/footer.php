@@ -1,7 +1,7 @@
 <?php
 /**
  * PwanDeal - Refined Footer
- * Enhanced with Social proof, Newsletter, and Smooth micro-interactions.
+ * Combined with Support links, Newsletter, and Social Proof.
  */
 
 if (!isset($base_url)) {
@@ -24,13 +24,16 @@ $is_admin = (isset($_SESSION['user_id']) && $_SESSION['user_id'] == 1);
                     <h4 class="fw-bold mb-0">Pwan<span style="color: #00BFB2;">Deal</span></h4>
                 </div>
                 <p class="small opacity-75 pe-lg-4" style="line-height: 1.8;">
-                    Empowering Pwani University students to turn skills into income and find affordable campus essentials. Join 100+ verified students today.
+                    Empowering Pwani University students to turn skills into income and find affordable campus essentials. Join 100+ verified students today in Kilifi.
                 </p>
                 <div class="d-flex gap-2 mt-4">
                     <a href="#" class="social-icon"><i class="bi bi-instagram"></i></a>
                     <a href="#" class="social-icon"><i class="bi bi-twitter-x"></i></a>
-                    <a href="#" class="social-icon"><i class="bi bi-facebook"></i></a>
-                    <a href="https://wa.me/254111602678" class="social-icon"><i class="bi bi-whatsapp"></i></a>
+                    <a href="https://wa.me/254111602678" target="_blank" class="social-icon"><i class="bi bi-whatsapp"></i></a>
+                </div>
+                <div class="mt-3">
+                    <span class="badge bg-success rounded-pill px-3">Kilifi Campus</span>
+                    <span class="badge bg-info rounded-pill px-3">Student Verified</span>
                 </div>
             </div>
 
@@ -55,13 +58,15 @@ $is_admin = (isset($_SESSION['user_id']) && $_SESSION['user_id'] == 1);
                         <li><a href="<?= $base_url; ?>/messages/inbox.php">Messages</a></li>
                     <?php endif; ?>
                     <li><a href="<?= $base_url; ?>/safety.php">Safety Tips</a></li>
+                    <?php if ($is_admin): ?>
+                        <li><a href="<?= $base_url; ?>/admin/dashboard.php" class="text-warning">⚙️ Admin Panel</a></li>
+                    <?php endif; ?>
                 </ul>
             </div>
 
             <div class="col-lg-4">
                 <h6 class="text-uppercase fw-bold mb-4 small tracking-wider text-white-50">Never Miss a Deal</h6>
-                <p class="small opacity-75 mb-3">Get notified when new hostels or hot deals are posted.</p>
-                <form action="#" class="newsletter-form position-relative">
+                <form action="#" class="newsletter-form position-relative mb-4">
                     <input type="email" class="form-control rounded-pill bg-dark border-0 text-white py-3 ps-4" 
                            placeholder="Enter your PU email" style="font-size: 0.9rem;">
                     <button type="submit" class="btn btn-primary rounded-circle position-absolute end-0 top-0 mt-1 me-1" 
@@ -69,24 +74,25 @@ $is_admin = (isset($_SESSION['user_id']) && $_SESSION['user_id'] == 1);
                         <i class="bi bi-send-fill"></i>
                     </button>
                 </form>
-                <div class="mt-4 small opacity-50">
-                    <i class="bi bi-geo-alt-fill me-1"></i> Kilifi, Pwani University Campus
+                
+                <div class="support-info small opacity-75">
+                    <div class="mb-2"><i class="bi bi-envelope-fill me-2 text-info"></i> support@pwandeal.pw</div>
+                    <div><i class="bi bi-geo-alt-fill me-2 text-info"></i> Pwani University Main Campus, Kilifi</div>
                 </div>
             </div>
         </div>
 
-        <hr style="border-color: rgba(255,255,255,0.05);">
+        <hr style="border-color: rgba(255,255,255,0.08);">
 
         <div class="row align-items-center pt-3 pb-2">
             <div class="col-md-6 text-center text-md-start">
                 <p class="x-small mb-0 opacity-50">
-                    &copy; <?= date('Y'); ?> <strong>PwanDeal</strong>. Designed for Pwanians.
+                    &copy; <?= date('Y'); ?> <strong>PwanDeal</strong>. Designed with ❤️ for Pwanians.
                 </p>
             </div>
             <div class="col-md-6 text-center text-md-end mt-3 mt-md-0">
-                <a href="<?= $base_url; ?>/privacy.php" class="footer-sub-link me-3">Privacy</a>
-                <a href="<?= $base_url; ?>/terms.php" class="footer-sub-link">Terms</a>
-                <a href="<?= $base_url; ?>/cookies.php" class="footer-sub-link">of service</a>
+                <a href="<?= $base_url; ?>/privacy.php" class="footer-sub-link me-3">Privacy Policy</a>
+                <a href="<?= $base_url; ?>/terms.php" class="footer-sub-link">Terms of Service</a>
             </div>
         </div>
     </div>
@@ -148,7 +154,7 @@ $is_admin = (isset($_SESSION['user_id']) && $_SESSION['user_id'] == 1);
     }
     .footer-sub-link:hover { color: #028090; }
 
-    /* Back to Top Refined */
+    /* Back to Top */
     #backToTopBtn {
         position: fixed;
         bottom: 30px;
@@ -176,17 +182,23 @@ $is_admin = (isset($_SESSION['user_id']) && $_SESSION['user_id'] == 1);
 
 <script>
 // Back to Top Logic
-const backToTopBtn = document.getElementById("backToTopBtn");
+const btt = document.getElementById("backToTopBtn");
 window.onscroll = function() {
     if (document.body.scrollTop > 300 || document.documentElement.scrollTop > 300) {
-        backToTopBtn.classList.add("show");
+        btt.classList.add("show");
     } else {
-        backToTopBtn.classList.remove("show");
+        btt.classList.remove("show");
     }
 };
-backToTopBtn.onclick = function() {
+btt.onclick = function() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
+
+// Tooltip initialization
+if (typeof bootstrap !== 'undefined') {
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
+    const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+}
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

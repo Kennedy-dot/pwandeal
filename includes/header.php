@@ -1,6 +1,7 @@
 <?php
 /**
  * PwanDeal - Global Header (Optimized)
+ * Combined with Security Checks, Unread Messages, and Modern UI
  */
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -8,21 +9,24 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 $base_url = '/pwandeal';
-require_once __DIR__ . '/../config/database.php';
-
 $unread_count = 0;
 
-if (isset($_SESSION['user_id']) && isset($conn)) {
+// 1. DATABASE & SECURITY PREP
+if (isset($_SESSION['user_id'])) {
     try {
+        if (!isset($conn)) {
+            require_once __DIR__ . '/../config/database.php';
+        }
+        
         $user_id = $_SESSION['user_id'];
         
-        // Unread Messages
+        // Fetch Unread Messages
         $msg_stmt = $conn->prepare('SELECT COUNT(*) as total FROM messages WHERE receiver_id = ? AND is_read = 0');
         $msg_stmt->bind_param('i', $user_id);
         $msg_stmt->execute();
         $unread_count = $msg_stmt->get_result()->fetch_assoc()['total'] ?? 0;
 
-        // Account Status Check
+        // Security: Verify if user was suspended since last click
         $status_stmt = $conn->prepare('SELECT is_suspended FROM users WHERE user_id = ?');
         $status_stmt->bind_param('i', $user_id);
         $status_stmt->execute();
@@ -35,6 +39,7 @@ if (isset($_SESSION['user_id']) && isset($conn)) {
         }
     } catch (Exception $e) {
         error_log("Header Error: " . $e->getMessage());
+        $unread_count = 0; 
     }
 }
 ?><!DOCTYPE html>
@@ -55,14 +60,21 @@ if (isset($_SESSION['user_id']) && isset($conn)) {
             --accent-yellow: #f4d03f;
         }
 
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8f9fa; }
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #f8f9fa; 
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
 
         .navbar-custom {
-            background: rgba(2, 128, 144, 0.95) !important;
+            background: linear-gradient(135deg, var(--primary-teal) 0%, var(--deep-navy) 100%) !important;
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding: 0.75rem 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         .notification-badge {
@@ -91,6 +103,11 @@ if (isset($_SESSION['user_id']) && isset($conn)) {
             font-size: 0.85rem;
             margin-right: 15px;
             text-decoration: none;
+            transition: 0.3s;
+        }
+        .nav-search-btn:hover {
+            background: rgba(255,255,255,0.2);
+            color: white;
         }
 
         .profile-img-nav {
@@ -119,7 +136,7 @@ if (isset($_SESSION['user_id']) && isset($conn)) {
             <span>PwanDeal</span>
         </a>
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <i class="bi bi-list-nested fs-1"></i>
         </button>
 
@@ -132,6 +149,7 @@ if (isset($_SESSION['user_id']) && isset($conn)) {
                 </li>
 
                 <li class="nav-item"><a class="nav-link" href="<?= $base_url; ?>/index.php">Home</a></li>
+                <li class="nav-item"><a class="nav-link" href="<?= $base_url; ?>/listings/view.php">Browse</a></li>
 
                 <?php if (isset($_SESSION['user_id'])): ?>
                     <li class="nav-item">
@@ -162,15 +180,22 @@ if (isset($_SESSION['user_id']) && isset($conn)) {
                             <span class="small fw-bold d-none d-sm-inline"><?= htmlspecialchars($first_name) ?></span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-3">
-                            <li><a class="dropdown-item" href="<?= $base_url; ?>/profile/view.php?id=<?= $_SESSION['user_id']; ?>"><i class="bi bi-person me-2"></i> Profile</a></li>
+                            <li><a class="dropdown-item py-2" href="<?= $base_url; ?>/profile/view.php?id=<?= $_SESSION['user_id']; ?>"><i class="bi bi-person me-2"></i> Profile</a></li>
+                            <li><a class="dropdown-item py-2" href="<?= $base_url; ?>/listings/my-listings.php"><i class="bi bi-grid me-2"></i> My Services</a></li>
+                            
+                            <?php if ($_SESSION['user_id'] == 1): ?>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item fw-bold text-primary py-2" href="<?= $base_url; ?>/admin/dashboard.php"><i class="bi bi-shield-lock me-2"></i> Admin Panel</a></li>
+                            <?php endif; ?>
+                            
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="<?= $base_url; ?>/auth/logout.php"><i class="bi bi-box-arrow-right me-2"></i> Logout</a></li>
+                            <li><a class="dropdown-item text-danger py-2" href="<?= $base_url; ?>/auth/logout.php"><i class="bi bi-box-arrow-right me-2"></i> Logout</a></li>
                         </ul>
                     </li>
                 <?php else: ?>
                     <li class="nav-item"><a class="nav-link" href="<?= $base_url; ?>/auth/login.php">Login</a></li>
                     <li class="nav-item ms-lg-3">
-                        <a class="btn btn-warning btn-sm fw-bold px-4 rounded-pill" href="<?= $base_url; ?>/auth/register.php">Join</a>
+                        <a class="btn btn-warning btn-sm fw-bold px-4 rounded-pill shadow-sm" href="<?= $base_url; ?>/auth/register.php">Join PwanDeal</a>
                     </li>
                 <?php endif; ?>
             </ul>
@@ -178,4 +203,4 @@ if (isset($_SESSION['user_id']) && isset($conn)) {
     </div>
 </nav>
 
-<main class="flex-grow-1"></main>
+<main class="container my-5 flex-grow-1"></main>

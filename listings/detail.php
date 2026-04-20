@@ -1,11 +1,13 @@
 <?php
 /**
  * PwanDeal - Service Details View
+ * Integrated Multi-image logic, Related Items, and Path Safety
  */
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
 $listing_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$base_url = '/pwandeal'; // Path consistency helper
 
 if ($listing_id === 0) {
     header('Location: browse.php');
@@ -28,10 +30,10 @@ $stmt->execute();
 $listing = $stmt->get_result()->fetch_assoc();
 
 if (!$listing) {
-    die("<div class='container py-5 text-center'><h1>Listing not found!</h1><a href='browse.php' class='btn btn-primary'>Back to browse</a></div>");
+    die("<div class='container py-5 text-center'><h1>Listing not found!</h1><a href='browse.php' class='btn btn-primary'>Back to Marketplace</a></div>");
 }
 
-// 2. VIEW COUNT LOGIC
+// 2. VIEW COUNT LOGIC (Prevent spamming views via session)
 if (!isset($_SESSION['viewed_listings'])) { $_SESSION['viewed_listings'] = []; }
 if (!in_array($listing_id, $_SESSION['viewed_listings'])) {
     $conn->query("UPDATE listings SET views = views + 1 WHERE listing_id = $listing_id");
@@ -57,7 +59,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="container py-4">
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="../index.php">Home</a></li>
+            <li class="breadcrumb-item"><a href="<?= $base_url ?>/index.php">Home</a></li>
             <li class="breadcrumb-item"><a href="browse.php">Marketplace</a></li>
             <li class="breadcrumb-item active text-truncate" style="max-width: 250px;"><?= htmlspecialchars($listing['title']) ?></li>
         </ol>
@@ -67,7 +69,11 @@ include __DIR__ . '/../includes/header.php';
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
                 <div class="position-relative">
-                    <?php $main_img = !empty($listing['image_url']) ? "../uploads/services/".$listing['image_url'] : "../assets/img/service-placeholder.jpg"; ?>
+                    <?php 
+                        $main_img = (!empty($listing['image_url'])) 
+                            ? "../uploads/services/".$listing['image_url'] 
+                            : "../assets/img/service-placeholder.jpg"; 
+                    ?>
                     <img src="<?= $main_img ?>" class="img-fluid w-100" style="height: 450px; object-fit: cover;" alt="Service">
                     <div class="position-absolute bottom-0 start-0 m-3">
                         <span class="badge bg-dark bg-opacity-75 px-3 py-2 rounded-pill"><i class="bi bi-eye me-1"></i> <?= $listing['views'] ?> views</span>
@@ -83,7 +89,7 @@ include __DIR__ . '/../includes/header.php';
                         </div>
                         <div class="text-end">
                             <div class="h2 fw-bold text-primary mb-0">KSh <?= number_format($listing['price']) ?></div>
-                            <span class="text-muted small">Fixed Price</span>
+                            <span class="badge bg-light text-muted border">Negotiable</span>
                         </div>
                     </div>
 
@@ -98,7 +104,31 @@ include __DIR__ . '/../includes/header.php';
                         <button class="btn btn-light btn-sm rounded-pill px-3 border" onclick="copyLink(this)">
                             <i class="bi bi-share me-1"></i> Copy Link
                         </button>
+                        <button class="btn btn-light btn-sm rounded-pill px-3 border" onclick="window.print()">
+                            <i class="bi bi-printer me-1"></i> Print
+                        </button>
                     </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-4">Provider Feedback</h5>
+                    <?php if ($reviews->num_rows > 0): ?>
+                        <?php while($rev = $reviews->fetch_assoc()): ?>
+                            <div class="mb-3 pb-3 border-bottom last-child-border-0">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="fw-bold small"><?= htmlspecialchars($rev['reviewer_name'] ?? 'Student') ?></span>
+                                    <div class="text-warning small">
+                                        <?= str_repeat('<i class="bi bi-star-fill"></i>', $rev['rating']) ?>
+                                    </div>
+                                </div>
+                                <p class="text-muted small mb-0">"<?= htmlspecialchars($rev['comment']) ?>"</p>
+                            </div>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <p class="text-muted small mb-0 text-center py-3">No reviews yet for this provider.</p>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -160,13 +190,17 @@ include __DIR__ . '/../includes/header.php';
                         <?php else: ?>
                             <a href="../auth/login.php" class="btn btn-primary py-2 fw-bold rounded-pill">Login to Chat</a>
                         <?php endif; ?>
+                        
+                        <a href="<?= $base_url ?>/profile/view.php?id=<?= $listing['user_id'] ?>" class="btn btn-link btn-sm text-decoration-none text-muted">
+                            View Provider Profile
+                        </a>
                     </div>
 
                     <div class="mt-4 p-3 rounded-3 bg-light border-start border-4 border-warning">
                         <h6 class="fw-bold small text-uppercase mb-2"><i class="bi bi-shield-lock me-1"></i> Stay Safe</h6>
                         <ul class="list-unstyled small mb-0 opacity-75" style="font-size: 0.8rem;">
                             <li class="mb-1">• Meet in public campus spots (e.g. Library, Cafe)</li>
-                            <li class="mb-1">• Never pay before seeing the item/service</li>
+                            <li class="mb-1">• Never pay before seeing the service</li>
                             <li>• Check the student's rating & profile</li>
                         </ul>
                     </div>

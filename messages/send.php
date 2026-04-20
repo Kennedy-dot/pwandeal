@@ -5,6 +5,7 @@
 session_start();
 require_once '../config/database.php';
 
+// 1. Auth Guard
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit();
@@ -16,11 +17,12 @@ $listing_id = isset($_GET['listing']) ? (int)$_GET['listing'] : null;
 $error = '';
 $success = false;
 
-// 1. Fetch Provider Details
+// 2. Fetch Provider Details
 if ($to_user_id > 0) {
-    // Prevent messaging yourself
+    // Security: Prevent messaging yourself
     if($to_user_id === $user_id) {
-        header('Location: ../listings/view.php?id=' . $listing_id);
+        $redirect = $listing_id ? "../listings/view.php?id=$listing_id" : "inbox.php";
+        header('Location: ' . $redirect);
         exit();
     }
 
@@ -33,20 +35,20 @@ if ($to_user_id > 0) {
         die("User not found!");
     }
 } else {
-    header('Location: ../listings/browse.php');
+    header('Location: ../listings/view.php');
     exit();
 }
 
-// 2. Get Listing Context (to show what they are inquiring about)
+// 3. Get Listing Context
 $listing = null;
 if ($listing_id) {
-    $stmt = $conn->prepare('SELECT title, price, listing_id FROM listings WHERE listing_id = ?');
+    $stmt = $conn->prepare('SELECT title, price FROM listings WHERE listing_id = ?');
     $stmt->bind_param('i', $listing_id);
     $stmt->execute();
     $listing = $stmt->get_result()->fetch_assoc();
 }
 
-// 3. Handle Message Submission
+// 4. Handle Message Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $message_text = trim($_POST['message'] ?? '');
     
@@ -55,9 +57,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($message_text) > 1000) {
         $error = 'Keep your message under 1000 characters.';
     } else {
-        // Optional: Add a check here to see if they've already sent this exact message 
-        // to avoid spamming the "Send" button.
-        
         $stmt = $conn->prepare('INSERT INTO messages (sender_id, receiver_id, listing_id, message_text) VALUES (?, ?, ?, ?)');
         $stmt->bind_param('iiis', $user_id, $to_user_id, $listing_id, $message_text);
         
@@ -78,25 +77,21 @@ include '../includes/header.php';
         <div class="col-md-7 col-lg-6">
             
             <?php if ($success): ?>
-                <div class="card border-0 shadow-lg rounded-4 text-center p-5 animate__animated animate__fadeIn">
+                <div class="card border-0 shadow-lg rounded-4 text-center p-5">
                     <div class="mb-4">
                         <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
                     </div>
-                    <h3 class="fw-bold text-dark">Inquiry Sent!</h3>
-                    <p class="text-muted">Taking you to your conversation with <?= htmlspecialchars($provider['name']) ?>...</p>
+                    <h3 class="fw-bold">Inquiry Sent!</h3>
+                    <p class="text-muted">Connecting you to <?= htmlspecialchars($provider['name']) ?>...</p>
                     
-                    <div class="mt-4">
-                        <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
-                        <span class="small text-muted">Redirecting...</span>
-                    </div>
-
                     <script>setTimeout(() => { window.location.href = 'chat.php?user=<?= $to_user_id ?>'; }, 2000);</script>
+                    <a href="chat.php?user=<?= $to_user_id ?>" class="btn btn-primary btn-lg rounded-pill mt-3 px-5 fw-bold">Open Chat Now</a>
                 </div>
             <?php else: ?>
 
                 <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
                     <div class="card-header bg-dark py-4 text-center text-white border-0">
-                        <h5 class="mb-0 fw-bold">Message Provider</h5>
+                        <h5 class="mb-0 fw-bold">Send Inquiry</h5>
                     </div>
 
                     <div class="card-body p-4 p-md-5">
@@ -104,7 +99,7 @@ include '../includes/header.php';
                             <div class="alert alert-info border-0 rounded-4 mb-4 d-flex align-items-center">
                                 <i class="bi bi-info-circle-fill fs-4 me-3"></i>
                                 <div>
-                                    <small class="d-block text-uppercase fw-bold opacity-75" style="font-size: 0.65rem;">Inquiring about</small>
+                                    <small class="d-block text-uppercase fw-bold opacity-75" style="font-size: 0.65rem;">Regarding</small>
                                     <span class="fw-bold"><?= htmlspecialchars($listing['title']) ?></span>
                                     <span class="badge bg-white text-info ms-2">KES <?= number_format($listing['price']) ?></span>
                                 </div>
@@ -115,13 +110,13 @@ include '../includes/header.php';
                             <div class="alert alert-danger rounded-3 border-0 mb-4"><?= $error ?></div>
                         <?php endif; ?>
 
-                        <div class="d-flex align-items-center mb-4">
+                        <div class="d-flex align-items-center mb-4 p-3 bg-light rounded-4">
                             <img src="<?= !empty($provider['profile_photo']) ? '../uploads/profiles/'.$provider['profile_photo'] : '../assets/img/default-avatar.png' ?>" 
                                  class="rounded-circle shadow-sm" style="width: 55px; height: 55px; object-fit: cover;">
                             <div class="ms-3">
                                 <h6 class="mb-0 fw-bold"><?= htmlspecialchars($provider['name']) ?></h6>
                                 <div class="text-warning small">
-                                    <i class="bi bi-star-fill"></i> <?= number_format($provider['average_rating'], 1) ?> Rating
+                                    <i class="bi bi-star-fill"></i> <?= number_format($provider['average_rating'], 1) ?> Provider Rating
                                 </div>
                             </div>
                         </div>
@@ -135,6 +130,7 @@ include '../includes/header.php';
                                           style="resize: none;" required></textarea>
                                 <div class="d-flex justify-content-between mt-2">
                                     <small class="text-muted"><span id="char-count">0</span>/1000</small>
+                                    <small class="text-info small">💡 Keep it polite!</small>
                                 </div>
                             </div>
 
@@ -142,7 +138,7 @@ include '../includes/header.php';
                                 <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold py-3 shadow">
                                     Send Message <i class="bi bi-send-fill ms-2"></i>
                                 </button>
-                                <a href="javascript:history.back();" class="btn btn-link text-muted text-decoration-none small">Cancel</a>
+                                <a href="javascript:history.back();" class="btn btn-link text-muted text-decoration-none small">Go Back</a>
                             </div>
                         </form>
                     </div>
@@ -154,7 +150,7 @@ include '../includes/header.php';
 </div>
 
 <script>
-    // Character counter
+    // Character counter for the textarea
     const textarea = document.getElementById('message');
     const counter = document.getElementById('char-count');
     if(textarea) {
