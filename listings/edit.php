@@ -29,12 +29,12 @@ if (!$listing) {
     die("Access denied or listing not found.");
 }
 
-// CSRF Token
+// CSRF Token Generation
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Fetch categories
+// Fetch categories for the dropdown
 $categories = $conn->query("SELECT * FROM categories ORDER BY name ASC");
 
 $error = '';
@@ -52,32 +52,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $category_id = intval($_POST['category_id'] ?? 0);
     $price = floatval($_POST['price'] ?? 0);
     $status = $_POST['status'] ?? 'active';
-    $image_path = $listing['image_url']; // Keep old image by default
+    $image_path = $listing['image_url']; // Default to current image
 
     // Validation
     if (strlen($title) < 5) {
-        $error = 'Title is too short.';
+        $error = 'Title must be at least 5 characters.';
     } elseif ($category_id == 0) {
-        $error = 'Please select a category.';
+        $error = 'Please select a valid category.';
     } else {
         // Handle Optional Image Change
         if (isset($_FILES['service_image']) && $_FILES['service_image']['error'] === 0) {
             $allowed = ['jpg', 'jpeg', 'png', 'webp'];
-            $ext = strtolower(pathinfo($_FILES['service_image']['name'], PATHINFO_EXTENSION));
+            $file_info = pathinfo($_FILES['service_image']['name']);
+            $ext = strtolower($file_info['extension']);
 
             if (in_array($ext, $allowed)) {
                 $new_name = "service_" . time() . "_" . bin2hex(random_bytes(4)) . "." . $ext;
-                $upload_path = "../assets/uploads/services/" . $new_name;
+                $upload_dir = "../assets/uploads/services/";
                 
-                if (move_uploaded_file($_FILES['service_image']['tmp_name'], $upload_path)) {
-                    // Delete old image if it wasn't the default
-                    if ($listing['image_url'] !== 'default-service.jpg') {
-                        @unlink("../assets/uploads/services/" . $listing['image_url']);
+                if (move_uploaded_file($_FILES['service_image']['tmp_name'], $upload_dir . $new_name)) {
+                    // Delete old image if it exists and isn't a default
+                    if (!empty($listing['image_url']) && $listing['image_url'] !== 'default-service.jpg') {
+                        if (file_exists($upload_dir . $listing['image_url'])) {
+                            @unlink($upload_dir . $listing['image_url']);
+                        }
                     }
                     $image_path = $new_name;
                 }
             } else {
-                $error = 'Invalid image format.';
+                $error = 'Invalid image format (JPG, PNG, WEBP only).';
             }
         }
 
@@ -91,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($update_stmt->execute()) {
                 $success = 'Changes saved successfully!';
-                // Refresh local data for the form
+                // Update local array to show new data in form
                 $listing['title'] = $title;
                 $listing['description'] = $description;
                 $listing['category_id'] = $category_id;
@@ -99,14 +102,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $listing['status'] = $status;
                 $listing['image_url'] = $image_path;
             } else {
-                $error = 'Database error. Please try again.';
+                $error = 'Failed to update database.';
             }
         }
     }
 }
 
 $page_title = 'Edit Service';
-$base_url = '..';
 include '../includes/header.php';
 ?>
 
@@ -131,32 +133,34 @@ include '../includes/header.php';
                     <form method="POST" enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
 
-                        <div class="row g-3">
-                            <div class="col-12 text-center mb-3">
-                                <label class="form-label d-block fw-bold text-muted">Service Image</label>
-                                <div class="mx-auto bg-light rounded-4 d-flex align-items-center justify-content-center overflow-hidden border" 
-                                     style="width: 200px; height: 150px; cursor: pointer;"
+                        <div class="row g-4">
+                            <div class="col-12 text-center mb-2">
+                                <label class="form-label d-block fw-bold text-muted small uppercase">Service Cover Image</label>
+                                <div class="mx-auto bg-light rounded-4 d-flex align-items-center justify-content-center overflow-hidden border shadow-sm" 
+                                     style="width: 240px; height: 160px; cursor: pointer;"
                                      onclick="document.getElementById('imageUpload').click();">
                                     <?php 
-                                        $current_img = $listing['image_url'] !== 'default-service.jpg' 
+                                        $display_img = (!empty($listing['image_url']) && $listing['image_url'] !== 'default-service.jpg') 
                                             ? "../assets/uploads/services/" . $listing['image_url'] 
                                             : "../assets/img/service-placeholder.jpg";
                                     ?>
-                                    <img id="preview" src="<?= $current_img ?>" style="width:100%; height:100%; object-fit:cover;">
+                                    <img id="preview" src="<?= $display_img ?>" style="width:100%; height:100%; object-fit:cover;">
                                 </div>
                                 <input type="file" name="service_image" id="imageUpload" hidden accept="image/*" onchange="previewImage(this, 'preview');">
-                                <small class="text-muted d-block mt-2">Click image to change</small>
+                                <small class="text-primary d-block mt-2" style="cursor:pointer;" onclick="document.getElementById('imageUpload').click();">
+                                    <i class="bi bi-camera me-1"></i> Change Photo
+                                </small>
                             </div>
 
                             <div class="col-12">
-                                <label class="form-label fw-bold">Title</label>
-                                <input type="text" name="title" class="form-control form-control-lg" 
+                                <label class="form-label fw-bold">Service Title</label>
+                                <input type="text" name="title" class="form-control form-control-lg bg-light border-0" 
                                        required value="<?= htmlspecialchars($listing['title']) ?>">
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Category</label>
-                                <select name="category_id" class="form-select form-select-lg" required>
+                                <select name="category_id" class="form-select form-select-lg bg-light border-0" required>
                                     <?php while($cat = $categories->fetch_assoc()): ?>
                                         <option value="<?= $cat['category_id'] ?>" <?= $listing['category_id'] == $cat['category_id'] ? 'selected' : '' ?>>
                                             <?= htmlspecialchars($cat['name']) ?>
@@ -167,22 +171,22 @@ include '../includes/header.php';
 
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Price (KSh)</label>
-                                <input type="number" name="price" class="form-control form-control-lg" 
+                                <input type="number" name="price" class="form-control form-control-lg bg-light border-0" 
                                        required value="<?= $listing['price'] ?>">
                             </div>
 
                             <div class="col-12">
-                                <label class="form-label fw-bold">Status</label>
-                                <select name="status" class="form-select">
-                                    <option value="active" <?= $listing['status'] == 'active' ? 'selected' : '' ?>>Active (Visible)</option>
-                                    <option value="inactive" <?= $listing['status'] == 'inactive' ? 'selected' : '' ?>>Inactive (Hidden)</option>
-                                    <option value="sold" <?= $listing['status'] == 'sold' ? 'selected' : '' ?>>Mark as Completed/Sold</option>
+                                <label class="form-label fw-bold">Listing Status</label>
+                                <select name="status" class="form-select bg-light border-0">
+                                    <option value="active" <?= $listing['status'] == 'active' ? 'selected' : '' ?>>Active (Visible to all)</option>
+                                    <option value="inactive" <?= $listing['status'] == 'inactive' ? 'selected' : '' ?>>Inactive (Private Draft)</option>
+                                    <option value="sold" <?= $listing['status'] == 'sold' ? 'selected' : '' ?>>Sold / Completed</option>
                                 </select>
                             </div>
 
                             <div class="col-12">
-                                <label class="form-label fw-bold">Description</label>
-                                <textarea name="description" id="description" class="form-control" rows="5" 
+                                <label class="form-label fw-bold">Detailed Description</label>
+                                <textarea name="description" id="description" class="form-control bg-light border-0" rows="5" 
                                           maxlength="1000" required><?= htmlspecialchars($listing['description']) ?></textarea>
                                 <div class="text-end small text-muted mt-1">
                                     <span id="char-count"><?= strlen($listing['description']) ?></span>/1000
@@ -190,10 +194,10 @@ include '../includes/header.php';
                             </div>
 
                             <div class="col-12 mt-4 d-flex gap-2">
-                                <button type="submit" class="btn btn-primary btn-lg flex-grow-1 fw-bold shadow-sm">
-                                    Update Listing
+                                <button type="submit" class="btn btn-primary btn-lg flex-grow-1 fw-bold shadow-sm py-3 rounded-3">
+                                    Save Changes
                                 </button>
-                                <a href="details.php?id=<?= $listing_id ?>" class="btn btn-light btn-lg border">View</a>
+                                <a href="my-listings.php" class="btn btn-light btn-lg border py-3 px-4 rounded-3">Cancel</a>
                             </div>
                         </div>
                     </form>
@@ -204,6 +208,7 @@ include '../includes/header.php';
 </div>
 
 <script>
+// Instant Image Preview
 function previewImage(input, previewId) {
     const preview = document.getElementById(previewId);
     if (input.files && input.files[0]) {
@@ -215,6 +220,7 @@ function previewImage(input, previewId) {
     }
 }
 
+// Character Counter
 document.getElementById('description').addEventListener('input', function() {
     document.getElementById('char-count').textContent = this.value.length;
 });

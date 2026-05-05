@@ -5,7 +5,7 @@
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-// 1. Auth Check (Must happen before any HTML output)
+// 1. Auth Check
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit();
@@ -14,6 +14,11 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $error = '';
 $success = '';
+
+// Security: Generate CSRF token
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
 // 2. Fetch current user data
 $stmt = $conn->prepare('SELECT * FROM users WHERE user_id = ?');
@@ -27,6 +32,11 @@ if (!$user) {
 
 // 3. Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // CSRF Check
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        die('Security token mismatch.');
+    }
+
     $name = trim($_POST['name'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
     $bio = trim($_POST['bio'] ?? '');
@@ -45,7 +55,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_FILES['profile_photo']) && $_FILES['profile_photo']['error'] === UPLOAD_ERR_OK) {
             $file = $_FILES['profile_photo'];
             $allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-            $file_type = mime_content_type($file['tmp_name']);
+            
+            // Check actual MIME type
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $file_type = $finfo->file($file['tmp_name']);
             
             if (!in_array($file_type, $allowed)) {
                 $error = 'Invalid file type. JPG, PNG, or WebP only.';
@@ -53,13 +66,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'File too large (max 2MB).';
             } else {
                 $upload_dir = '../uploads/profiles/';
-                if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+                if (!file_exists($upload_dir)) mkdir($upload_dir, 0755, true);
 
                 $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
                 $new_photo = 'user_'.$user_id.'_'.time().'.'.$ext;
                 
                 if (move_uploaded_file($file['tmp_name'], $upload_dir.$new_photo)) {
-                    // Cleanup: Delete old photo if it's not the default avatar
+                    // Cleanup: Delete old photo if it's not the default
                     if (!empty($user['profile_photo']) && $user['profile_photo'] !== 'default-avatar.png') {
                         $old_path = $upload_dir . $user['profile_photo'];
                         if (file_exists($old_path)) @unlink($old_path);
@@ -77,10 +90,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($update->execute()) {
                 $success = 'Profile updated successfully!';
                 $_SESSION['user_name'] = $name; 
-                // Sync local data for immediate UI update
-                $user['name'] = $name; $user['phone'] = $phone; $user['bio'] = $bio;
-                $user['school'] = $school; $user['year_of_study'] = $year_of_study;
-                $user['profile_photo'] = $new_photo;
+                // Refresh local data
+                $user = array_merge($user, [
+                    'name' => $name, 'phone' => $phone, 'bio' => $bio,
+                    'school' => $school, 'year_of_study' => $year_of_study, 'profile_photo' => $new_photo
+                ]);
             } else {
                 $error = 'Update failed. Please try again.';
             }
@@ -95,37 +109,34 @@ include '../includes/header.php';
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-6">
-            <nav aria-label="breadcrumb" class="mb-4">
-                <ol class="breadcrumb small">
-                    <li class="breadcrumb-item"><a href="dashboard.php" class="text-decoration-none">Dashboard</a></li>
-                    <li class="breadcrumb-item active">Edit Profile</li>
-                </ol>
-            </nav>
-
             <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
                 <div class="card-header text-center text-white py-4" style="background: linear-gradient(135deg, #028090, #1e2761);">
                     <h3 class="fw-bold mb-0">Update Profile</h3>
-                    <p class="small opacity-75 mb-0">Customize how others see you on PwanDeal</p>
+                    <p class="small opacity-75 mb-0">Customize your PwanDeal student identity</p>
                 </div>
                 
                 <div class="card-body p-4 p-md-5">
                     <?php if ($error): ?>
-                        <div class="alert alert-danger border-0 rounded-3 small py-2">
+                        <div class="alert alert-danger border-0 rounded-3 small py-2 animate__animated animate__shakeX">
                              <i class="bi bi-exclamation-circle me-2"></i><?= htmlspecialchars($error) ?>
                         </div>
                     <?php endif; ?>
                     
                     <?php if ($success): ?>
-                        <div class="alert alert-success border-0 rounded-3 small py-2">
+                        <div class="alert alert-success border-0 rounded-3 small py-2 animate__animated animate__fadeIn">
                             <i class="bi bi-check-circle me-2"></i><?= htmlspecialchars($success) ?>
                         </div>
                     <?php endif; ?>
 
                     <form method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+
                         <div class="text-center mb-5">
                             <div class="position-relative d-inline-block">
                                 <?php 
-                                    $photo_path = !empty($user['profile_photo']) ? '../uploads/profiles/'.$user['profile_photo'] : '../assets/img/default-avatar.png';
+                                    $photo_path = (!empty($user['profile_photo']) && file_exists('../uploads/profiles/'.$user['profile_photo'])) 
+                                                  ? '../uploads/profiles/'.$user['profile_photo'] 
+                                                  : '../assets/img/default-avatar.png';
                                 ?>
                                 <img src="<?= $photo_path ?>" 
                                      class="rounded-circle shadow-sm object-fit-cover border border-4 border-white" 
@@ -135,7 +146,7 @@ include '../includes/header.php';
                                 </label>
                             </div>
                             <input type="file" id="profile_photo" name="profile_photo" class="d-none" accept="image/*" onchange="previewImage(this)">
-                            <p class="text-muted small mt-2">Click icon to change photo</p>
+                            <p class="text-muted small mt-2">Recommended: Square image (max 2MB)</p>
                         </div>
 
                         <div class="row g-3">
@@ -176,12 +187,12 @@ include '../includes/header.php';
 
                             <div class="col-12">
                                 <label class="form-label fw-bold small text-muted text-uppercase">WhatsApp / Phone</label>
-                                <input type="tel" class="form-control bg-light border-0" name="phone" value="<?= htmlspecialchars($user['phone'] ?? '') ?>" placeholder="07...">
+                                <input type="tel" class="form-control bg-light border-0" name="phone" value="<?= htmlspecialchars($user['phone'] ?? '') ?>" placeholder="0712345678">
                             </div>
 
                             <div class="col-12">
                                 <label class="form-label fw-bold small text-muted text-uppercase">About You (Bio)</label>
-                                <textarea class="form-control bg-light border-0" name="bio" rows="4" maxlength="500" placeholder="E.g. I provide professional hair braiding services near the Main Gate..."><?= htmlspecialchars($user['bio'] ?? '') ?></textarea>
+                                <textarea class="form-control bg-light border-0" name="bio" id="bio_text" rows="4" maxlength="500" placeholder="Tell other students about what you do..."><?= htmlspecialchars($user['bio'] ?? '') ?></textarea>
                                 <div class="text-end mt-1" style="font-size: 0.75rem; color: #aaa;">
                                     <span id="char-count">0</span>/500 characters
                                 </div>
@@ -189,8 +200,10 @@ include '../includes/header.php';
                         </div>
 
                         <div class="d-grid gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm" style="background-color: #028090; border: none;">Save Changes</button>
-                            <a href="dashboard.php" class="btn btn-link text-decoration-none text-muted small">Discard Changes</a>
+                            <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm" style="background-color: #028090; border: none;">
+                                Save Profile Changes
+                            </button>
+                            <a href="dashboard.php" class="btn btn-link text-decoration-none text-muted small">Go back to Dashboard</a>
                         </div>
                     </form>
                 </div>
@@ -200,7 +213,7 @@ include '../includes/header.php';
 </div>
 
 <script>
-// Image preview before upload
+// Image preview
 function previewImage(input) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
@@ -209,12 +222,14 @@ function previewImage(input) {
     }
 }
 
-// Real-time character counter
-const bioArea = document.querySelector('textarea[name="bio"]');
+// Character counter initialization
+const bioArea = document.getElementById('bio_text');
 const charCounter = document.getElementById('char-count');
+
 if(bioArea) {
-    charCounter.textContent = bioArea.value.length;
-    bioArea.addEventListener('input', () => charCounter.textContent = bioArea.value.length);
+    const updateCount = () => charCounter.textContent = bioArea.value.length;
+    updateCount();
+    bioArea.addEventListener('input', updateCount);
 }
 </script>
 

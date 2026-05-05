@@ -1,187 +1,266 @@
 <?php
 /**
- * PwanDeal - Edit Existing Service (Resolved)
+ * PwanDeal - My Listings / My Services
+ * LOOP-PROOF VERSION
  */
-session_start();
+
+// 1. START SESSION FIRST (before any headers)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// 2. LOAD DATABASE
 require_once __DIR__ . '/../config/database.php';
 
+// 3. AUTHENTICATION CHECK (NOT to this page, but to login)
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit();
 }
 
 $user_id = $_SESSION['user_id'];
-$listing_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$listings = [];
+$error_message = '';
 
-// 1. Fetch & Ownership Verification (Joining with images table)
-$stmt = $conn->prepare("
-    SELECT l.*, i.image_url 
-    FROM listings l 
-    LEFT JOIN listing_images i ON l.listing_id = i.listing_id AND i.is_primary = 1 
-    WHERE l.listing_id = ? AND l.user_id = ?
-");
-$stmt->bind_param("ii", $listing_id, $user_id);
-$stmt->execute();
-$listing = $stmt->get_result()->fetch_assoc();
-
-if (!$listing) {
-    header('Location: my-listings.php?error=unauthorized');
-    exit();
+// 4. FETCH ALL USER'S LISTINGS
+try {
+    $stmt = $conn->prepare("
+        SELECT 
+            l.listing_id,
+            l.title,
+            l.description,
+            l.price,
+            l.status,
+            l.image_url,
+            l.created_at,
+            l.updated_at,
+            c.name as category_name,
+            COUNT(r.review_id) as review_count,
+            AVG(r.rating) as avg_rating
+        FROM listings l
+        LEFT JOIN categories c ON l.category_id = c.category_id
+        LEFT JOIN reviews r ON l.listing_id = r.listing_id
+        WHERE l.user_id = ?
+        GROUP BY l.listing_id
+        ORDER BY l.created_at DESC
+    ");
+    
+    if (!$stmt) {
+        throw new Exception("Database preparation failed: " . $conn->error);
+    }
+    
+    $stmt->bind_param('i', $user_id);
+    if (!$stmt->execute()) {
+        throw new Exception("Query execution failed: " . $stmt->error);
+    }
+    
+    $result = $stmt->get_result();
+    $listings = $result->fetch_all(MYSQLI_ASSOC);
+    
+} catch (Exception $e) {
+    error_log("My Listings Error: " . $e->getMessage());
+    $error_message = "Unable to load your listings. Please try again later.";
 }
 
-$categories = $conn->query("SELECT * FROM categories ORDER BY name ASC");
-$errors = [];
-$success = false;
-
-// 2. Handle Form Submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $title = trim($_POST['title']);
-    $description = trim($_POST['description']);
-    $price = (float)$_POST['price'];
-    $category_id = (int)$_POST['category_id'];
-    $status = $_POST['status']; 
+// 5. HANDLE DELETE ACTION
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    $listing_id = isset($_POST['listing_id']) ? (int)$_POST['listing_id'] : 0;
     
-    if (empty($title)) $errors[] = "Title is required.";
-    if ($price <= 0) $errors[] = "Please enter a valid price.";
-
-    if (empty($errors)) {
-        $conn->begin_transaction();
-
+    if ($listing_id > 0) {
         try {
-            // Update Basic Info
-            $update_sql = "UPDATE listings SET title = ?, description = ?, price = ?, 
-                           category_id = ?, status = ?, updated_at = NOW() 
-                           WHERE listing_id = ? AND user_id = ?";
-            $update_stmt = $conn->prepare($update_sql);
-            $update_stmt->bind_param("ssdisii", $title, $description, $price, $category_id, $status, $listing_id, $user_id);
-            $update_stmt->execute();
-
-            // Handle Image Upload
-            if (isset($_FILES['image']) && $_FILES['image']['error'] === 0) {
-                $allowed = ['jpg', 'jpeg', 'png', 'webp'];
-                $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+            // Verify ownership BEFORE deleting
+            $check_stmt = $conn->prepare("SELECT user_id FROM listings WHERE listing_id = ?");
+            $check_stmt->bind_param('i', $listing_id);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result()->fetch_assoc();
+            
+            if ($check_result && $check_result['user_id'] == $user_id) {
+                // Safe to delete - user owns this listing
+                $delete_stmt = $conn->prepare("DELETE FROM listings WHERE listing_id = ?");
+                $delete_stmt->bind_param('i', $listing_id);
                 
-                if (in_array($ext, $allowed)) {
-                    $new_name = "service_" . time() . "_" . bin2hex(random_bytes(4)) . "." . $ext;
-                    $upload_path = "../uploads/services/" . $new_name;
-                    
-                    if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_path)) {
-                        $conn->query("UPDATE listing_images SET is_primary = 0 WHERE listing_id = $listing_id");
-                        
-                        $img_stmt = $conn->prepare("INSERT INTO listing_images (listing_id, image_url, is_primary) VALUES (?, ?, 1)");
-                        $img_stmt->bind_param("is", $listing_id, $new_name);
-                        $img_stmt->execute();
-
-                        if ($listing['image_url'] && file_exists("../uploads/services/" . $listing['image_url'])) {
-                            @unlink("../uploads/services/" . $listing['image_url']);
-                        }
-                        $listing['image_url'] = $new_name;
-                    }
+                if ($delete_stmt->execute()) {
+                    $_SESSION['success_msg'] = "Listing deleted successfully.";
+                    // Redirect to refresh the page (not a loop - we refresh data)
+                    header('Location: my-listings.php');
+                    exit();
                 } else {
-                    throw new Exception("Invalid image format.");
+                    $error_message = "Failed to delete listing.";
                 }
+            } else {
+                $error_message = "You don't have permission to delete this listing.";
             }
-
-            $conn->commit();
-            $success = true;
-            $listing['title'] = $title;
         } catch (Exception $e) {
-            $conn->rollback();
-            $errors[] = $e->getMessage();
+            error_log("Delete Error: " . $e->getMessage());
+            $error_message = "An error occurred while deleting.";
         }
     }
 }
 
-$page_title = "Edit " . $listing['title'];
-include '../includes/header.php';
+// 6. SET PAGE TITLE
+$page_title = 'My Services';
+
+// 7. INCLUDE HEADER (after all redirects and logic)
+include __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <nav aria-label="breadcrumb" class="mb-4">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="my-listings.php" class="text-decoration-none text-muted">My Services</a></li>
-                    <li class="breadcrumb-item active">Edit Listing</li>
-                </ol>
-            </nav>
-
-            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-                <div class="card-body p-4">
-                    <h3 class="fw-bold mb-4">Update Service</h3>
-
-                    <?php if ($success): ?>
-                        <div class="alert alert-success border-0 shadow-sm mb-4">
-                            ✨ <strong>Success!</strong> Your service has been updated. 
-                            <a href="detail.php?id=<?= $listing_id ?>" class="alert-link ms-2">View listing →</a>
-                        </div>
-                    <?php endif; ?>
-
-                    <?php if (!empty($errors)): ?>
-                        <div class="alert alert-danger border-0 mb-4">
-                            <ul class="mb-0"><?php foreach($errors as $e) echo "<li>$e</li>"; ?></ul>
-                        </div>
-                    <?php endif; ?>
-
-                    <form action="" method="POST" enctype="multipart/form-data">
-                        <div class="row g-4">
-                            <div class="col-12">
-                                <label class="form-label small fw-bold text-muted text-uppercase">Cover Image</label>
-                                <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3 border">
-                                    <?php $preview = !empty($listing['image_url']) ? "../uploads/services/".$listing['image_url'] : "../assets/img/service-placeholder.jpg"; ?>
-                                    <img src="<?= $preview ?>" class="rounded-3 shadow-sm" style="width: 80px; height: 80px; object-fit: cover;">
-                                    <div class="flex-grow-1">
-                                        <input type="file" name="image" class="form-control form-control-sm">
-                                        <div class="form-text small">Uploading a new image replaces the current one.</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Title</label>
-                                <input type="text" name="title" class="form-control" value="<?= htmlspecialchars($listing['title']) ?>" required>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Category</label>
-                                <select name="category_id" class="form-select">
-                                    <?php while($cat = $categories->fetch_assoc()): ?>
-                                        <option value="<?= $cat['category_id'] ?>" <?= ($cat['category_id'] == $listing['category_id']) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($cat['name']) ?>
-                                        </option>
-                                    <?php endwhile; ?>
-                                </select>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Price (KSh)</label>
-                                <input type="number" name="price" class="form-control" value="<?= $listing['price'] ?>" required>
-                            </div>
-
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Description</label>
-                                <textarea name="description" class="form-control" rows="4" required><?= htmlspecialchars($listing['description']) ?></textarea>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Status</label>
-                                <select name="status" class="form-select">
-                                    <option value="active" <?= $listing['status'] == 'active' ? 'selected' : '' ?>>Active</option>
-                                    <option value="sold" <?= $listing['status'] == 'sold' ? 'selected' : '' ?>>Sold</option>
-                                    <option value="archived" <?= $listing['status'] == 'archived' ? 'selected' : '' ?>>Archived</option>
-                                </select>
-                            </div>
-
-                            <div class="col-12 pt-3 border-top">
-                                <button type="submit" class="btn btn-primary px-5 fw-bold rounded-pill">Save Changes</button>
-                                <a href="my-listings.php" class="btn btn-link text-muted ms-2">Cancel</a>
-                            </div>
-                        </div>
-                    </form>
+    <!-- Header Section -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="fw-bold mb-2">📦 My Services</h1>
+                    <p class="text-muted">Manage your active listings and track your sales</p>
                 </div>
+                <a href="create.php" class="btn btn-primary btn-lg fw-bold rounded-pill px-5 shadow-sm" 
+                   style="background-color: #028090; border: none;">
+                    <i class="bi bi-plus-lg me-2"></i> Post New Service
+                </a>
             </div>
         </div>
     </div>
+
+    <!-- Success Message -->
+    <?php if (isset($_SESSION['success_msg'])): ?>
+        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
+            <i class="bi bi-check-circle me-2"></i>
+            <strong><?= htmlspecialchars($_SESSION['success_msg']) ?></strong>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <?php unset($_SESSION['success_msg']); ?>
+    <?php endif; ?>
+
+    <!-- Error Message -->
+    <?php if (!empty($error_message)): ?>
+        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong><?= htmlspecialchars($error_message) ?></strong>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+
+    <!-- Empty State -->
+    <?php if (empty($listings)): ?>
+        <div class="row">
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <div style="font-size: 4rem; opacity: 0.3; margin-bottom: 20px;">📭</div>
+                    <h3 class="text-muted fw-bold">No services yet</h3>
+                    <p class="text-muted mb-4">Start earning by posting your first service to the marketplace!</p>
+                    <a href="create.php" class="btn btn-primary btn-lg fw-bold rounded-pill px-5" 
+                       style="background-color: #028090; border: none;">
+                        <i class="bi bi-plus-lg me-2"></i> Create Your First Service
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    <!-- Listings Grid -->
+    <?php else: ?>
+        <div class="row g-4">
+            <?php foreach ($listings as $listing): ?>
+                <div class="col-md-6 col-lg-4">
+                    <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden listing-card">
+                        <!-- Image Section -->
+                        <div style="position: relative; height: 200px; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);">
+                            <?php 
+                                $img_path = !empty($listing['image_url']) && $listing['image_url'] !== 'default-service.jpg'
+                                    ? '../assets/uploads/services/' . htmlspecialchars($listing['image_url'])
+                                    : '../assets/img/service-placeholder.jpg';
+                            ?>
+                            <img src="<?= $img_path ?>" 
+                                 alt="<?= htmlspecialchars($listing['title']) ?>"
+                                 class="w-100 h-100" 
+                                 style="object-fit: cover;">
+                            
+                            <!-- Status Badge -->
+                            <span class="position-absolute top-3 start-3 badge <?php 
+                                if ($listing['status'] === 'active') echo 'bg-success';
+                                elseif ($listing['status'] === 'sold') echo 'bg-secondary';
+                                elseif ($listing['status'] === 'inactive') echo 'bg-warning text-dark';
+                                else echo 'bg-info';
+                            ?>">
+                                <?= ucfirst(htmlspecialchars($listing['status'])) ?>
+                            </span>
+
+                            <!-- Rating Badge -->
+                            <span class="position-absolute top-3 end-3 badge bg-dark bg-opacity-75">
+                                <i class="bi bi-star-fill text-warning me-1"></i>
+                                <?= $listing['review_count'] > 0 ? number_format($listing['avg_rating'], 1) : 'New' ?>
+                            </span>
+                        </div>
+
+                        <!-- Content Section -->
+                        <div class="card-body d-flex flex-column">
+                            <!-- Title -->
+                            <h6 class="fw-bold mb-2 text-truncate" title="<?= htmlspecialchars($listing['title']) ?>">
+                                <?= htmlspecialchars($listing['title']) ?>
+                            </h6>
+
+                            <!-- Category & Date -->
+                            <p class="small text-muted mb-2">
+                                <i class="bi bi-tag me-1"></i> 
+                                <?= htmlspecialchars($listing['category_name'] ?? 'Uncategorized') ?>
+                            </p>
+
+                            <!-- Description Preview -->
+                            <p class="small text-muted mb-3 flex-grow-1" style="height: 40px; overflow: hidden; line-height: 1.4;">
+                                <?= htmlspecialchars(substr($listing['description'], 0, 70)) ?>...
+                            </p>
+
+                            <!-- Price & Reviews -->
+                            <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                                <span class="h5 fw-bold mb-0" style="color: #028090;">
+                                    KSh <?= number_format($listing['price'], 0) ?>
+                                </span>
+                                <span class="small text-muted">
+                                    <i class="bi bi-chat-dots"></i> <?= $listing['review_count'] ?> review<?= $listing['review_count'] !== 1 ? 's' : '' ?>
+                                </span>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="d-grid gap-2">
+                                <a href="detail.php?id=<?= $listing['listing_id'] ?>" class="btn btn-outline-primary btn-sm rounded-pill fw-bold">
+                                    <i class="bi bi-eye me-1"></i> View
+                                </a>
+                                <a href="edit.php?id=<?= $listing['listing_id'] ?>" class="btn btn-outline-secondary btn-sm rounded-pill fw-bold">
+                                    <i class="bi bi-pencil me-1"></i> Edit
+                                </a>
+                                <form method="POST" style="display: inline-block; width: 100%;" 
+                                      onsubmit="return confirm('Are you sure you want to delete this listing? This action cannot be undone.');">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="listing_id" value="<?= $listing['listing_id'] ?>">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm w-100 rounded-pill fw-bold">
+                                        <i class="bi bi-trash me-1"></i> Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 </div>
 
-<?php include '../includes/footer.php'; ?>
+<style>
+    .listing-card {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .listing-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 32px rgba(2, 128, 144, 0.2) !important;
+    }
+
+    .listing-card img {
+        transition: transform 0.3s ease;
+    }
+
+    .listing-card:hover img {
+        transform: scale(1.05);
+    }
+</style>
+
+<?php include __DIR__ . '/../includes/footer.php'; ?>
