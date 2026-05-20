@@ -1,7 +1,6 @@
 <?php
 /**
  * PwanDeal - Manage Reports (Admin)
- * Updated with CSRF security and Action Linking
  */
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -37,15 +36,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 4. FETCH PENDING REPORTS (With listing/user context)
+// 4. FETCH PENDING REPORTS
 $sql = "SELECT r.*, 
                u1.name as reporter_name, 
                u2.name as reported_user_name,
                l.title as reported_listing_title
         FROM reports r
         JOIN users u1 ON r.reporter_id = u1.user_id
-        LEFT JOIN users u2 ON r.reported_item_id = u2.user_id AND r.report_type = 'user'
-        LEFT JOIN listings l ON r.reported_item_id = l.listing_id AND r.report_type = 'listing'
+        LEFT JOIN users u2 ON (r.target_type = 'user' AND r.target_id = u2.user_id)
+        LEFT JOIN listings l ON (r.target_type = 'listing' AND r.target_id = l.listing_id)
         WHERE r.status = 'pending'
         ORDER BY r.created_at DESC";
 
@@ -82,7 +81,7 @@ include __DIR__ . '/../includes/header.php';
                             <tr>
                                 <th class="ps-4 py-3 border-0">Timestamp</th>
                                 <th class="py-3 border-0">Reporter</th>
-                                <th class="py-3 border-0">Subject</th>
+                                <th class="py-3 border-0">Target Type</th>
                                 <th class="py-3 border-0">Reason</th>
                                 <th class="py-3 border-0 text-end pe-4">Action</th>
                             </tr>
@@ -90,21 +89,15 @@ include __DIR__ . '/../includes/header.php';
                         <tbody>
                             <?php while($row = $result->fetch_assoc()): ?>
                                 <tr>
-                                    <td class="ps-4 small text-muted">
-                                        <?= date('M d, H:i', strtotime($row['created_at'])) ?>
-                                    </td>
+                                    <td class="ps-4 small text-muted"><?= date('M d, H:i', strtotime($row['created_at'])) ?></td>
+                                    <td><span class="fw-bold text-dark"><?= htmlspecialchars($row['reporter_name']) ?></span></td>
                                     <td>
-                                        <span class="fw-bold text-dark"><?= htmlspecialchars($row['reporter_name']) ?></span>
-                                    </td>
-                                    <td>
-                                        <span class="badge rounded-pill <?= $row['report_type'] === 'user' ? 'bg-warning text-dark' : 'bg-info text-white' ?> px-3">
-                                            <?= ucfirst($row['report_type']) ?>
+                                        <span class="badge rounded-pill <?= $row['target_type'] === 'user' ? 'bg-warning text-dark' : 'bg-info text-white' ?> px-3">
+                                            <?= ucfirst($row['target_type']) ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <div class="text-truncate text-muted" style="max-width: 200px;">
-                                            <?= htmlspecialchars($row['reason']) ?>
-                                        </div>
+                                        <div class="text-truncate text-muted" style="max-width: 200px;"><?= htmlspecialchars($row['reason']) ?></div>
                                     </td>
                                     <td class="text-end pe-4">
                                         <div class="btn-group">
@@ -128,39 +121,26 @@ include __DIR__ . '/../includes/header.php';
                                             <div class="modal-body">
                                                 <div class="row g-3 mb-3">
                                                     <div class="col-6">
-                                                        <label class="small text-muted d-block text-uppercase fw-bold">From Reporter</label>
+                                                        <label class="small text-muted d-block text-uppercase fw-bold">From</label>
                                                         <p class="mb-0 fw-semibold"><?= htmlspecialchars($row['reporter_name']) ?></p>
                                                     </div>
                                                     <div class="col-6">
-                                                        <label class="small text-muted d-block text-uppercase fw-bold">Target</label>
-                                                        <p class="mb-0 fw-semibold text-danger">
-                                                            <?= ucfirst($row['report_type']) ?> #<?= $row['reported_item_id'] ?>
-                                                        </p>
+                                                        <label class="small text-muted d-block text-uppercase fw-bold">Target ID</label>
+                                                        <p class="mb-0 fw-semibold text-danger"><?= ucfirst($row['target_type']) ?> #<?= $row['target_id'] ?></p>
                                                     </div>
                                                 </div>
-                                                
                                                 <div class="p-3 bg-light rounded-3 mb-3">
-                                                    <label class="small text-muted d-block text-uppercase fw-bold mb-1">Reason for Flagging</label>
-                                                    <p class="mb-0 text-dark" style="white-space: pre-wrap;"><?= htmlspecialchars($row['reason']) ?></p>
+                                                    <label class="small text-muted d-block text-uppercase fw-bold mb-1">Reason</label>
+                                                    <p class="mb-0 text-dark"><?= htmlspecialchars($row['reason']) ?></p>
                                                 </div>
-
-                                                <?php if($row['report_type'] === 'listing'): ?>
-                                                    <div class="alert alert-info border-0 py-2 small">
-                                                        <i class="bi bi-info-circle me-1"></i> Listing: <strong><?= htmlspecialchars($row['reported_listing_title'] ?? 'N/A') ?></strong>
-                                                    </div>
-                                                <?php elseif($row['reported_user_name']): ?>
-                                                    <div class="alert alert-warning border-0 py-2 small">
-                                                        <i class="bi bi-person-circle me-1"></i> User: <strong><?= htmlspecialchars($row['reported_user_name']) ?></strong>
-                                                    </div>
+                                                <?php if($row['target_type'] === 'listing' && $row['reported_listing_title']): ?>
+                                                    <div class="alert alert-info border-0 py-2 small">Listing: <strong><?= htmlspecialchars($row['reported_listing_title']) ?></strong></div>
+                                                <?php elseif($row['target_type'] === 'user' && $row['reported_user_name']): ?>
+                                                    <div class="alert alert-warning border-0 py-2 small">User: <strong><?= htmlspecialchars($row['reported_user_name']) ?></strong></div>
                                                 <?php endif; ?>
                                             </div>
                                             <div class="modal-footer border-0 pt-0">
                                                 <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>
-                                                <?php if($row['report_type'] === 'listing'): ?>
-                                                    <a href="/pwandeal/listings/detail.php?id=<?= $row['reported_item_id'] ?>" class="btn btn-primary rounded-pill px-4" target="_blank">View Listing</a>
-                                                <?php else: ?>
-                                                    <a href="/pwandeal/admin/users.php?id=<?= $row['reported_item_id'] ?>" class="btn btn-warning rounded-pill px-4">View User</a>
-                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
@@ -173,16 +153,10 @@ include __DIR__ . '/../includes/header.php';
                 <div class="text-center py-5">
                     <i class="bi bi-shield-check display-1 text-muted opacity-25"></i>
                     <h4 class="text-muted fw-bold mt-3">Moderation queue empty</h4>
-                    <p class="text-muted">No reports currently pending.</p>
                 </div>
             <?php endif; ?>
         </div>
     </div>
 </div>
-
-<style>
-    .table-hover tbody tr:hover { background-color: rgba(0,0,0,0.01); }
-    .badge { font-weight: 600; font-size: 0.75rem; }
-</style>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
