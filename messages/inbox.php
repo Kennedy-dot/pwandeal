@@ -102,7 +102,7 @@ function formatInboxTime($datetime) {
                             </div>
                             <h5 class="text-secondary">Your inbox is empty</h5>
                             <p class="text-muted mb-4">Messages from service providers will appear here.</p>
-                            <a href="../listings/browse.php" class="btn btn-primary rounded-pill px-4">Find a Service</a>
+                            <a href="../index.php" class="btn btn-primary rounded-pill px-4">Find a Service</a>
                         </div>
                     <?php endif; ?>
                 </div>

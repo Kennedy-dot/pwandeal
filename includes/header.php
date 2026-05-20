@@ -181,6 +181,7 @@ if (isset($_SESSION['user_id'])) {
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-3">
                             <li><a class="dropdown-item py-2" href="<?= $base_url; ?>/profile/view.php?id=<?= $_SESSION['user_id']; ?>"><i class="bi bi-person me-2"></i> Profile</a></li>
+                            <li><a class="dropdown-item py-2" href="<?= $base_url; ?>/profile/edit.php"><i class="bi bi-person-gear me-2"></i> Edit Profile</a></li>
                             <li><a class="dropdown-item py-2" href="<?= $base_url; ?>/listings/my-listings.php"><i class="bi bi-grid me-2"></i> My Services</a></li>
                             
                             <?php if ($_SESSION['user_id'] == 1): ?>
@@ -203,4 +204,5 @@ if (isset($_SESSION['user_id'])) {
     </div>
 </nav>
 
-<main class="container my-5 flex-grow-1"></main>
+<!-- Opened main section tag. Will be cleanly closed down inside footer.php -->
+<main class="flex-grow-1"></main>

@@ -134,9 +134,9 @@ include '../includes/header.php';
                         <div class="text-center mb-5">
                             <div class="position-relative d-inline-block">
                                 <?php 
-                                    $photo_path = (!empty($user['profile_photo']) && file_exists('../uploads/profiles/'.$user['profile_photo'])) 
-                                                  ? '../uploads/profiles/'.$user['profile_photo'] 
-                                                  : '../assets/img/default-avatar.png';
+                                    $photo_path = (!empty($user['profile_photo']) && file_exists(__DIR__ . '/../uploads/profiles/'.$user['profile_photo'])) 
+                                                  ? '/pwandeal/uploads/profiles/'.$user['profile_photo'] 
+                                                  : '/pwandeal/assets/img/default-avatar.png';
                                 ?>
                                 <img src="<?= $photo_path ?>" 
                                      class="rounded-circle shadow-sm object-fit-cover border border-4 border-white" 
@@ -203,7 +203,8 @@ include '../includes/header.php';
                             <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm" style="background-color: #028090; border: none;">
                                 Save Profile Changes
                             </button>
-                            <a href="dashboard.php" class="btn btn-link text-decoration-none text-muted small">Go back to Dashboard</a>
+                            <!-- FIXED: Dynamic link pointing safely to index.php homepage -->
+                            <a href="<?= $base_url; ?>/index.php" class="btn btn-link text-decoration-none text-muted small">Go back to Marketplace</a>
                         </div>
                     </form>
                 </div>

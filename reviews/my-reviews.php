@@ -29,11 +29,14 @@ $user_stmt->bind_param('i', $user_id);
 $user_stmt->execute();
 $user = $user_stmt->get_result()->fetch_assoc();
 
-$total_reviews = $user['total_reviews'];
+$total_reviews = $user ? (int)$user['total_reviews'] : 0;
+$average_rating = $user ? (float)$user['average_rating'] : 0.0;
 $total_pages = ceil($total_reviews / $limit);
 
 // 2. Fetch Paginated Reviews with Join on Reviewer and Listing
-$sql = "SELECT r.*, u.name as reviewer_name, u.profile_photo as reviewer_photo, l.title as listing_title
+$sql = "SELECT r.rating, r.title, r.comment, r.created_at, 
+               u.name as reviewer_name, u.profile_photo as reviewer_photo, 
+               l.title as listing_title
         FROM reviews r
         LEFT JOIN users u ON r.from_user_id = u.user_id
         LEFT JOIN listings l ON r.listing_id = l.listing_id
@@ -58,7 +61,7 @@ include '../includes/header.php';
                     <div class="row align-items-center">
                         <div class="col-md-auto text-center mb-4 mb-md-0">
                             <div class="rating-circle mx-auto">
-                                <h1 class="fw-bold mb-0 text-dark"><?= number_format($user['average_rating'], 1) ?></h1>
+                                <h1 class="fw-bold mb-0 text-dark"><?= number_format($average_rating, 1) ?></h1>
                                 <div class="text-warning">
                                     <i class="bi bi-star-fill"></i>
                                 </div>
@@ -76,9 +79,9 @@ include '../includes/header.php';
                                 <div class="vr d-none d-md-block"></div>
                                 <div class="stat-item">
                                     <span class="text-muted small fw-bold text-uppercase d-block mb-1">Trust Level</span>
-                                    <?php if($user['average_rating'] >= 4.5): ?>
+                                    <?php if($average_rating >= 4.5): ?>
                                         <span class="badge bg-success rounded-pill px-3">Elite Provider</span>
-                                    <?php elseif($user['average_rating'] >= 3.0): ?>
+                                    <?php elseif($average_rating >= 3.0): ?>
                                         <span class="badge bg-primary rounded-pill px-3">Verified Student</span>
                                     <?php else: ?>
                                         <span class="badge bg-secondary rounded-pill px-3">New/Improving</span>
@@ -99,28 +102,33 @@ include '../includes/header.php';
                 Recent Student Feedback
             </h5>
             
-            <?php if ($reviews->num_rows > 0): ?>
+            <?php if ($reviews && $reviews->num_rows > 0): ?>
                 <?php while ($row = $reviews->fetch_assoc()): ?>
                     <div class="card border-0 shadow-sm rounded-4 mb-4 review-card">
                         <div class="card-body p-4">
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div class="d-flex align-items-center">
-                                    <img src="<?= !empty($row['reviewer_photo']) ? '../uploads/profiles/'.$row['reviewer_photo'] : '../assets/img/default-avatar.png' ?>" 
-                                         class="rounded-circle me-3 border" style="width: 48px; height: 48px; object-fit: cover;">
+                                    <img src="<?= !empty($row['reviewer_photo']) ? '../uploads/profiles/'.htmlspecialchars($row['reviewer_photo']) : '../assets/img/default-avatar.png' ?>" 
+                                         class="rounded-circle me-3 border" style="width: 48px; height: 48px; object-fit: cover;" alt="Reviewer Avatar">
                                     <div>
                                         <h6 class="fw-bold mb-0 text-dark"><?= htmlspecialchars($row['reviewer_name'] ?? 'Anonymous Student') ?></h6>
                                         <small class="text-muted"><?= date('M j, Y', strtotime($row['created_at'])) ?></small>
                                     </div>
                                 </div>
                                 <div class="text-warning">
-                                    <?php for($i=1; $i<=5; $i++) echo '<i class="bi bi-star'.($i <= $row['rating'] ? '-fill' : '').'"></i>'; ?>
+                                    <?php 
+                                    $rating = isset($row['rating']) ? (int)$row['rating'] : 0;
+                                    for($i=1; $i<=5; $i++) {
+                                        echo '<i class="bi bi-star'.($i <= $rating ? '-fill' : '').'"></i>';
+                                    } 
+                                    ?>
                                 </div>
                             </div>
                             
-                            <h6 class="fw-bold text-dark mb-2"><?= htmlspecialchars($row['title']) ?></h6>
-                            <p class="text-secondary mb-3" style="font-style: italic;">"<?= htmlspecialchars($row['comment']) ?>"</p>
+                            <h6 class="fw-bold text-dark mb-2"><?= htmlspecialchars($row['title'] ?? '') ?></h6>
+                            <p class="text-secondary mb-3" style="font-style: italic;">"<?= htmlspecialchars($row['comment'] ?? '') ?>"</p>
                             
-                            <?php if ($row['listing_title']): ?>
+                            <?php if (!empty($row['listing_title'])): ?>
                                 <div class="bg-light px-3 py-2 rounded-pill d-inline-block">
                                     <small class="text-muted">
                                         <i class="bi bi-cart-check me-1"></i> Item: <span class="text-dark fw-medium"><?= htmlspecialchars($row['listing_title']) ?></span>

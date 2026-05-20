@@ -6,7 +6,6 @@ session_start();
 require_once __DIR__ . '/../config/database.php';
 
 // 1. Get user_id from URL or fallback to logged-in user
-// Fixed typo: changed $GET to $_GET
 $view_user_id = isset($_GET['id']) ? (int)$_GET['id'] : ($_SESSION['user_id'] ?? 0);
 
 if ($view_user_id === 0) {
@@ -104,7 +103,7 @@ include __DIR__ . '/../includes/header.php';
                              ? '../uploads/profiles/'.$user['profile_photo'] 
                              : '../assets/img/default-avatar.png'; 
                 ?>
-                <img src="<?= $photo ?>" class="rounded-circle profile-avatar shadow-sm mb-3">
+                <img src="<?= $photo ?>" class="rounded-circle profile-avatar shadow-sm mb-3" alt="Profile Photo">
                 
                 <h3 class="fw-bold mb-0"><?= htmlspecialchars($user['name']) ?></h3>
                 <p class="text-muted small"><i class="bi bi-patch-check-fill text-primary"></i> Pwani Student Community</p>
@@ -150,14 +149,14 @@ include __DIR__ . '/../includes/header.php';
 
                 <div class="d-grid gap-2">
                     <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $view_user_id): ?>
-                        <a href="edit-profile.php" class="btn btn-outline-dark rounded-pill fw-bold">
+                        <a href="edit.php" class="btn btn-outline-dark rounded-pill fw-bold">
                             <i class="bi bi-pencil-square me-2"></i>Edit My Profile
                         </a>
                     <?php else: ?>
                         <a href="../messages/chat.php?user=<?= $view_user_id ?>" class="btn btn-primary rounded-pill shadow-sm py-2 fw-bold" style="background-color: #028090; border: none;">
                             <i class="bi bi-chat-fill me-2"></i>Message Student
                         </a>
-                        <a href="../reviews/add.php?to_user=<?= $view_user_id ?>" class="btn btn-link btn-sm text-decoration-none text-muted mt-1">
+                        <a href="../reviews/add.php?to_user_id=<?= $view_user_id ?>" class="btn btn-link btn-sm text-decoration-none text-muted mt-1">
                             <i class="bi bi-star me-1"></i>Rate this user
                         </a>
                     <?php endif; ?>
@@ -190,7 +189,7 @@ include __DIR__ . '/../includes/header.php';
                                 <div class="col-md-6">
                                     <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
                                         <div class="position-relative">
-                                            <img src="<?= $list['main_image'] ? '../uploads/services/'.$list['main_image'] : '../assets/img/placeholder.jpg' ?>" class="card-img-top listing-card-img">
+                                            <img src="<?= $list['main_image'] ? '../uploads/services/'.$list['main_image'] : '../assets/img/placeholder.jpg' ?>" class="card-img-top listing-card-img" alt="Service Image">
                                             <span class="position-absolute top-0 end-0 m-2 badge bg-dark opacity-75">KSh <?= number_format($list['price']) ?></span>
                                         </div>
                                         <div class="card-body p-3">

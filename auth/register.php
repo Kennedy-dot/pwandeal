@@ -53,9 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $verification_code = random_int(100000, 999999);
             $hashed_password = password_hash($password, PASSWORD_BCRYPT);
             
-            $stmt = $conn->prepare('INSERT INTO users (name, email, password, school, year, verification_code, is_verified) VALUES (?, ?, ?, ?, ?, ?, 0)');
-            $stmt->bind_param('sssssi', $name, $email, $hashed_password, $school, $year, $verification_code);
-            
+            $stmt = $conn->prepare('INSERT INTO users (name, email, password, school, year_of_study, verification_code, is_verified) VALUES (?, ?, ?, ?, ?, ?, 0)');
+$stmt->bind_param('sssssi', $name, $email, $hashed_password, $school, $year, $verification_code);
             if ($stmt->execute()) {
                 $_SESSION['verify_email'] = $email; 
                 $success = 'Account created! Your verification code is: <strong>' . $verification_code . '</strong>';

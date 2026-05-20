@@ -14,11 +14,11 @@ if ($listing_id === 0) {
     exit();
 }
 
-// 1. FETCH DATA (Joined with listing_images for the primary photo)
+// 1. FETCH DATA (FIXED: Removed u.total_listings to prevent database query failures)
 $stmt = $conn->prepare("
     SELECT l.*, c.name as category_name, i.image_url,
            u.name as provider_name, u.email, u.profile_photo, u.school, 
-           u.average_rating, u.total_reviews, u.total_listings
+           u.average_rating, u.total_reviews
     FROM listings l 
     JOIN categories c ON l.category_id = c.category_id 
     JOIN users u ON l.user_id = u.user_id 
@@ -51,6 +51,13 @@ $related_stmt = $conn->prepare("SELECT l.*, i.image_url FROM listings l LEFT JOI
 $related_stmt->bind_param('ii', $listing['category_id'], $listing_id);
 $related_stmt->execute();
 $related_items = $related_stmt->get_result();
+
+// 5. SERVICE TALLY (Dynamic fallback query so we safely display total service count)
+$tally_stmt = $conn->prepare("SELECT COUNT(*) as total_services FROM listings WHERE user_id = ? AND status = 'active'");
+$tally_stmt->bind_param('i', $listing['user_id']);
+$tally_stmt->execute();
+$tally_result = $tally_stmt->get_result()->fetch_assoc();
+$total_services_count = $tally_result['total_services'] ?? 0;
 
 $page_title = $listing['title'];
 include __DIR__ . '/../includes/header.php';
@@ -169,7 +176,8 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                             <div class="vr text-muted"></div>
                             <div class="text-center">
-                                <div class="fw-bold"><?= $listing['total_listings'] ?></div>
+                                <!-- FIXED: Uses verified $total_services_count variable instead of query-breaking table target -->
+                                <div class="fw-bold"><?= $total_services_count ?></div>
                                 <div class="small text-muted" style="font-size: 0.7rem;">Services</div>
                             </div>
                         </div>
@@ -178,7 +186,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="d-grid gap-2">
                         <?php if (isset($_SESSION['user_id'])): ?>
                             <?php if ($_SESSION['user_id'] != $listing['user_id']): ?>
-                                <a href="../messages/chat.php?seller_id=<?= $listing['user_id'] ?>&listing_id=<?= $listing_id ?>" 
+                                <a href="../messages/send.php?to=<?= $listing['user_id'] ?>&listing=<?= $listing_id ?>" 
                                    class="btn btn-primary py-2 fw-bold rounded-pill">
                                     <i class="bi bi-chat-dots-fill me-2"></i> Chat with Seller
                                 </a>

@@ -1,6 +1,9 @@
 <?php
 /**
  * PwanDeal - Delete Review
+ * 
+ * NOTE: This action should be requested via a POST form to prevent
+ * accidental deletion via web crawlers or pre-fetching browsers.
  */
 session_start();
 require_once '../config/database.php';
@@ -12,7 +15,14 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $user_id = $_SESSION['user_id'];
-$review_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+// Enforce POST method for destructive actions
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header("Location: ../dashboard/index.php?error=invalid_method");
+    exit();
+}
+
+$review_id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
 
 // 2. Verify ownership & Fetch Provider ID
 // We must get to_user_id BEFORE we delete the row to know whose stats to update
@@ -23,11 +33,11 @@ $review = $stmt->get_result()->fetch_assoc();
 
 if (!$review) {
     // If review doesn't exist or doesn't belong to the user, redirect with error
-    header("Location: ../listings/view.php?error=unauthorized");
+    header("Location: ../dashboard/index.php?error=unauthorized");
     exit();
 }
 
-$provider_id = $review['to_user_id'];
+$provider_id = (int)$review['to_user_id'];
 
 // 3. Atomic Delete & Recalculate
 $conn->begin_transaction();
@@ -38,7 +48,8 @@ try {
     $del->bind_param("i", $review_id);
     $del->execute();
 
-    /** * B. Recalculate provider stats
+    /** 
+     * B. Recalculate provider stats
      * IFNULL is crucial: if it was the user's only review, 
      * AVG() returns NULL, but we want it to show 0 on their profile.
      */
@@ -57,7 +68,8 @@ try {
     header("Location: ../profile/view.php?id=" . $provider_id . "&success=review_deleted");
 } catch (Exception $e) {
     $conn->rollback();
-    // Log error for debugging if needed: error_log($e->getMessage());
+    // Log error for system monitoring
+    error_log("Review deletion failed: " . $e->getMessage());
     header("Location: ../profile/view.php?id=" . $provider_id . "&error=delete_failed");
 }
 exit();

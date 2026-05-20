@@ -97,7 +97,7 @@ include '../includes/header.php';
 
     <div class="row justify-content-center">
         <div class="col-md-7 col-lg-6">
-            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden" style="position: relative; z-index: 5;">
                 <div class="card-header border-0 p-4 text-center text-white" style="background: linear-gradient(135deg, #1e2761 0%, #028090 100%);">
                     <h3 class="fw-bold mb-0">Update Review</h3>
                 </div>
@@ -128,13 +128,13 @@ include '../includes/header.php';
                         </div>
                     <?php endif; ?>
 
-                    <form method="POST">
+                    <form method="POST" action="">
                         <div class="mb-4 text-center">
-                            <label class="form-label d-block fw-bold text-muted small text-uppercase mb-3">Adjust Your Stars</label>
-                            <div class="star-rating d-flex flex-row-reverse justify-content-center">
+                            <label class="form-label d-block fw-bold text-muted small text-uppercase mb-2">Adjust Your Stars</label>
+                            <div class="star-rating container d-flex flex-row-reverse justify-content-center">
                                 <?php for($i=5; $i>=1; $i--): ?>
-                                    <input type="radio" name="rating" value="<?= $i ?>" id="star<?= $i ?>" class="btn-check" <?= $review['rating'] == $i ? 'checked' : '' ?> required>
-                                    <label for="star<?= $i ?>" class="star-label mx-1">★</label>
+                                    <input type="radio" name="rating" value="<?= $i ?>" id="star<?= $i ?>" <?= $review['rating'] == $i ? 'checked' : '' ?> required>
+                                    <label for="star<?= $i ?>" class="star-label px-1">★</label>
                                 <?php endfor; ?>
                             </div>
                         </div>
@@ -170,29 +170,51 @@ include '../includes/header.php';
 </div>
 
 <style>
+    .star-rating {
+        border: none;
+        position: relative;
+        z-index: 10;
+    }
+    /* Hide radio inputs reliably without layout disruptions */
+    .star-rating input[type="radio"] {
+        position: absolute;
+        top: 0;
+        left: 0;
+        opacity: 0;
+        width: 0;
+        height: 0;
+        margin: 0;
+        padding: 0;
+        pointer-events: none;
+    }
     .star-label { 
         font-size: 2.8rem;
         color: #dee2e6; 
         cursor: pointer; 
-        transition: transform 0.2s, color 0.2s; 
+        display: inline-block;
+        transition: color 0.15s ease-in-out, transform 0.1s ease; 
+        user-select: none;
     }
-    .star-rating input:checked ~ .star-label,
+    /* Cascade selection highlight colors through reverse flex matching context */
+    .star-rating input[type="radio"]:checked ~ .star-label,
     .star-rating .star-label:hover,
     .star-rating .star-label:hover ~ .star-label {
-        color: #ffc107;
+        color: #ffc107 !important;
     }
-    .star-label:active { transform: scale(0.9); }
+    .star-label:active { transform: scale(0.85); }
     .x-small { font-size: 0.65rem; }
 </style>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
     const textarea = document.getElementById('comment');
     const counter = document.getElementById('char-count');
-    if(textarea) {
+    if(textarea && counter) {
         textarea.addEventListener('input', () => {
             counter.textContent = textarea.value.length;
         });
     }
+});
 </script>
 
 <?php include '../includes/footer.php'; ?>
