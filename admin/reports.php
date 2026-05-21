@@ -2,13 +2,16 @@
 /**
  * PwanDeal - Manage Reports (Admin)
  */
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 require_once __DIR__ . '/../config/database.php';
 
-// 1. ADMIN ACCESS CONTROL
+// 1. ADMIN ACCESS CONTROL (Super Admin ID: 1)
 if (!isset($_SESSION['user_id']) || $_SESSION['user_id'] !== 1) {
     header('Location: /pwandeal/auth/login.php');
     exit();
@@ -60,7 +63,7 @@ include __DIR__ . '/../includes/header.php';
             <h2 class="fw-bold mb-1" style="color: #1e2761;">🚩 Community Reports</h2>
             <p class="text-muted small mb-0">Moderation queue for Pwani University community</p>
         </div>
-        <a href="/pwandeal/admin/dashboard.php" class="btn btn-outline-secondary rounded-pill px-3 btn-sm">
+        <a href="/pwandeal/admin/index.php" class="btn btn-outline-secondary rounded-pill px-3 btn-sm">
             <i class="bi bi-arrow-left"></i> Dashboard
         </a>
     </div>

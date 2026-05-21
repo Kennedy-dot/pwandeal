@@ -1,15 +1,17 @@
 <?php
 /**
  * PwanDeal - Manage Users (Admin)
- * Updated with CSRF security, Search, and Enhanced UI
  */
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 require_once __DIR__ . '/../config/database.php';
 
-// 1. ADMIN ACCESS CONTROL
+// 1. ADMIN ACCESS CONTROL (Super Admin ID: 1)
 if (!isset($_SESSION['user_id']) || $_SESSION['user_id'] !== 1) {
     header('Location: /pwandeal/auth/login.php');
     exit();
@@ -193,7 +195,6 @@ include __DIR__ . '/../includes/header.php';
                                     </div>
                                 </div>
                                 <?php endif; ?>
-                                
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr><td colspan="5" class="text-center py-5 text-muted">No users matching your criteria.</td></tr>
@@ -226,7 +227,7 @@ include __DIR__ . '/../includes/header.php';
     <?php endif; ?>
 
     <div class="mt-4">
-        <a href="/pwandeal/admin/dashboard.php" class="btn btn-link text-decoration-none text-muted p-0">
+        <a href="/pwandeal/admin/index.php" class="btn btn-link text-decoration-none text-muted p-0">
             <i class="bi bi-arrow-left"></i> Back to Dashboard
         </a>
     </div>

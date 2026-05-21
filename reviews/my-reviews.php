@@ -18,22 +18,24 @@ $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $limit = 10;
 $offset = ($page - 1) * $limit;
 
-// 1. Fetch Summary Stats & User Info
-$user_stmt = $conn->prepare("
-    SELECT name, profile_photo, 
-           COALESCE(average_rating, 0) as average_rating, 
-           COALESCE(total_reviews, 0) as total_reviews 
-    FROM users WHERE user_id = ?
-");
+// 1. Fetch User Info
+$user_stmt = $conn->prepare("SELECT name, profile_photo FROM users WHERE user_id = ?");
 $user_stmt->bind_param('i', $user_id);
 $user_stmt->execute();
 $user = $user_stmt->get_result()->fetch_assoc();
 
-$total_reviews = $user ? (int)$user['total_reviews'] : 0;
-$average_rating = $user ? (float)$user['average_rating'] : 0.0;
+// 2. Fetch Summary Stats ON-THE-FLY from the reviews table
+// This ensures the counts are always accurate even if the users table isn't updated
+$stats_stmt = $conn->prepare("SELECT COUNT(*) as total, AVG(rating) as avg_rating FROM reviews WHERE to_user_id = ?");
+$stats_stmt->bind_param('i', $user_id);
+$stats_stmt->execute();
+$stats = $stats_stmt->get_result()->fetch_assoc();
+
+$total_reviews = (int)($stats['total'] ?? 0);
+$average_rating = (float)($stats['avg_rating'] ?? 0.0);
 $total_pages = ceil($total_reviews / $limit);
 
-// 2. Fetch Paginated Reviews with Join on Reviewer and Listing
+// 3. Fetch Paginated Reviews with Join on Reviewer and Listing
 $sql = "SELECT r.rating, r.title, r.comment, r.created_at, 
                u.name as reviewer_name, u.profile_photo as reviewer_photo, 
                l.title as listing_title

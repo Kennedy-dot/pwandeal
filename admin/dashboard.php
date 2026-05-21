@@ -2,6 +2,9 @@
 /**
  * PwanDeal - Admin Dashboard
  */
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -9,29 +12,37 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../config/database.php';
 
 // 1. ADMIN ACCESS CONTROL
-// Assuming user_id 1 is the primary admin as per your logic
 if (!isset($_SESSION['user_id']) || $_SESSION['user_id'] !== 1) {
     header('Location: /pwandeal/auth/login.php');
     exit();
 }
 
 $page_title = 'Admin Dashboard';
-$base_url = '/pwandeal';
 
 // 2. FETCH STATISTICS
 // Users
-$total_users = $conn->query("SELECT COUNT(*) as c FROM users")->fetch_assoc()['c'];
-$suspended_users = $conn->query("SELECT COUNT(*) as c FROM users WHERE is_suspended=1")->fetch_assoc()['c'];
+$total_users_res = $conn->query("SELECT COUNT(*) as c FROM users");
+$total_users = $total_users_res ? $total_users_res->fetch_assoc()['c'] : 0;
 
-// Listings & Revenue
-$active_listings = $conn->query("SELECT COUNT(*) as c FROM listings WHERE status='active'")->fetch_assoc()['c'];
-$revenue_res = $conn->query("SELECT SUM(price) as total FROM listings WHERE status='sold'");
-$total_revenue = $revenue_res->fetch_assoc()['total'] ?? 0;
+$suspended_users_res = $conn->query("SELECT COUNT(*) as c FROM users WHERE is_suspended=1");
+$suspended_users = $suspended_users_res ? $suspended_users_res->fetch_assoc()['c'] : 0;
+
+// Listings & Revenue (Using COALESCE to ensure 0 instead of NULL)
+$active_listings_res = $conn->query("SELECT COUNT(*) as c FROM listings WHERE status='active'");
+$active_listings = $active_listings_res ? $active_listings_res->fetch_assoc()['c'] : 0;
+
+$revenue_res = $conn->query("SELECT COALESCE(SUM(price), 0) as total FROM listings WHERE status='sold'");
+$total_revenue = $revenue_res ? $revenue_res->fetch_assoc()['total'] : 0;
 
 // Interactions
-$total_messages = $conn->query("SELECT COUNT(*) as c FROM messages")->fetch_assoc()['c'];
-$total_reviews = $conn->query("SELECT COUNT(*) as c FROM reviews")->fetch_assoc()['c'];
-$pending_reports = $conn->query("SELECT COUNT(*) as c FROM reports WHERE status='pending'")->fetch_assoc()['c'];
+$total_messages_res = $conn->query("SELECT COUNT(*) as c FROM messages");
+$total_messages = $total_messages_res ? $total_messages_res->fetch_assoc()['c'] : 0;
+
+$total_reviews_res = $conn->query("SELECT COUNT(*) as c FROM reviews");
+$total_reviews = $total_reviews_res ? $total_reviews_res->fetch_assoc()['c'] : 0;
+
+$pending_reports_res = $conn->query("SELECT COUNT(*) as c FROM reports WHERE status='pending'");
+$pending_reports = $pending_reports_res ? $pending_reports_res->fetch_assoc()['c'] : 0;
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -47,7 +58,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="card border-0 shadow-sm h-100 rounded-4">
                 <div class="card-body text-center">
                     <div class="display-6 mb-2">👥</div>
-                    <h3 class="fw-bold mb-0" style="color: #028090;"><?= number_format($total_users) ?></h3>
+                    <h3 class="fw-bold mb-0" style="color: #028090;"><?= number_format($total_users ?? 0) ?></h3>
                     <small class="text-muted text-uppercase fw-bold">Total Users</small>
                 </div>
             </div>
@@ -57,7 +68,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="card border-0 shadow-sm h-100 rounded-4">
                 <div class="card-body text-center">
                     <div class="display-6 mb-2">📋</div>
-                    <h3 class="fw-bold mb-0" style="color: #27ae60;"><?= number_format($active_listings) ?></h3>
+                    <h3 class="fw-bold mb-0" style="color: #27ae60;"><?= number_format($active_listings ?? 0) ?></h3>
                     <small class="text-muted text-uppercase fw-bold">Active Listings</small>
                 </div>
             </div>
@@ -67,7 +78,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="card border-0 shadow-sm h-100 rounded-4">
                 <div class="card-body text-center">
                     <div class="display-6 mb-2">💬</div>
-                    <h3 class="fw-bold mb-0" style="color: #3498db;"><?= number_format($total_messages) ?></h3>
+                    <h3 class="fw-bold mb-0" style="color: #3498db;"><?= number_format($total_messages ?? 0) ?></h3>
                     <small class="text-muted text-uppercase fw-bold">Total Messages</small>
                 </div>
             </div>
@@ -77,7 +88,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="card border-0 shadow-sm h-100 rounded-4">
                 <div class="card-body text-center">
                     <div class="display-6 mb-2">💰</div>
-                    <h3 class="fw-bold mb-0" style="color: #1abc9c;">KSh <?= number_format($total_revenue) ?></h3>
+                    <h3 class="fw-bold mb-0" style="color: #1abc9c;">KSh <?= number_format($total_revenue ?? 0) ?></h3>
                     <small class="text-muted text-uppercase fw-bold">Market Value</small>
                 </div>
             </div>
@@ -142,7 +153,7 @@ include __DIR__ . '/../includes/header.php';
             </a>
         </div>
         <div class="col-md-3">
-            <a href="/pwandeal/reviews/my-reviews.php" class="text-decoration-none">
+            <a href="/pwandeal/admin/manage-reviews.php" class="text-decoration-none">
                 <div class="card h-100 border-0 shadow-sm hover-effect py-3 rounded-4">
                     <div class="card-body text-center">
                         <h5 class="fw-bold" style="color: #FFD700;">Reviews</h5>

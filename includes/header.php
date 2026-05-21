@@ -173,7 +173,8 @@ if (isset($_SESSION['user_id'])) {
                         <a class="nav-link dropdown-toggle d-flex align-items-center bg-white bg-opacity-10 rounded-pill px-3 py-1" 
                            href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
                             <?php 
-                                $nav_avatar = (!empty($_SESSION['profile_photo'])) ? $base_url.'/uploads/profiles/'.$_SESSION['profile_photo'] : $base_url.'/assets/img/default-avatar.png';
+                                // Added ?v=time() to force browser to refresh the image
+                                $nav_avatar = (!empty($_SESSION['profile_photo'])) ? $base_url.'/uploads/profiles/'.$_SESSION['profile_photo'].'?v='.time() : $base_url.'/assets/img/default-avatar.png';
                                 $first_name = isset($_SESSION['user_name']) ? explode(' ', $_SESSION['user_name'])[0] : 'Student';
                             ?>
                             <img src="<?= $nav_avatar ?>" class="profile-img-nav me-2">
@@ -204,5 +205,4 @@ if (isset($_SESSION['user_id'])) {
     </div>
 </nav>
 
-<!-- Opened main section tag. Will be cleanly closed down inside footer.php -->
 <main class="flex-grow-1"></main>

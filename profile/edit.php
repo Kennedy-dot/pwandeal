@@ -89,7 +89,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($update->execute()) {
                 $success = 'Profile updated successfully!';
+                
+                // --- SYNC SESSION DATA ---
                 $_SESSION['user_name'] = $name; 
+                $_SESSION['profile_photo'] = $new_photo; 
+                
                 // Refresh local data
                 $user = array_merge($user, [
                     'name' => $name, 'phone' => $phone, 'bio' => $bio,
@@ -134,9 +138,10 @@ include '../includes/header.php';
                         <div class="text-center mb-5">
                             <div class="position-relative d-inline-block">
                                 <?php 
+                                    // Use relative path for reliability across different folders
                                     $photo_path = (!empty($user['profile_photo']) && file_exists(__DIR__ . '/../uploads/profiles/'.$user['profile_photo'])) 
-                                                  ? '/pwandeal/uploads/profiles/'.$user['profile_photo'] 
-                                                  : '/pwandeal/assets/img/default-avatar.png';
+                                                  ? '../uploads/profiles/'.$user['profile_photo'] 
+                                                  : '../assets/img/default-avatar.png';
                                 ?>
                                 <img src="<?= $photo_path ?>" 
                                      class="rounded-circle shadow-sm object-fit-cover border border-4 border-white" 
@@ -149,6 +154,7 @@ include '../includes/header.php';
                             <p class="text-muted small mt-2">Recommended: Square image (max 2MB)</p>
                         </div>
 
+                        <!-- Form fields remain the same -->
                         <div class="row g-3">
                             <div class="col-12">
                                 <label class="form-label fw-bold small text-muted text-uppercase">Full Name</label>
@@ -160,15 +166,7 @@ include '../includes/header.php';
                                 <select class="form-select bg-light border-0" name="school">
                                     <option value="">Select School</option>
                                     <?php 
-                                    $schools = [
-                                        "School of Education (SED)",
-                                        "School of Pure & Applied Sciences (SPAS)",
-                                        "School of Humanities & Social Sciences (SHSS)",
-                                        "School of Business & Economics (SBE)",
-                                        "School of Health & Human Sciences (SHHS)",
-                                        "School of Environmental & Earth Sciences (SEES)",
-                                        "School of Ag. Sciences & Agribusiness (SASA)"
-                                    ];
+                                    $schools = ["School of Education (SED)", "School of Pure & Applied Sciences (SPAS)", "School of Humanities & Social Sciences (SHSS)", "School of Business & Economics (SBE)", "School of Health & Human Sciences (SHHS)", "School of Environmental & Earth Sciences (SEES)", "School of Ag. Sciences & Agribusiness (SASA)"];
                                     foreach($schools as $s): ?>
                                         <option value="<?= $s ?>" <?= $user['school'] === $s ? 'selected' : '' ?>><?= $s ?></option>
                                     <?php endforeach; ?>
@@ -203,8 +201,7 @@ include '../includes/header.php';
                             <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm" style="background-color: #028090; border: none;">
                                 Save Profile Changes
                             </button>
-                            <!-- FIXED: Dynamic link pointing safely to index.php homepage -->
-                            <a href="<?= $base_url; ?>/index.php" class="btn btn-link text-decoration-none text-muted small">Go back to Marketplace</a>
+                            <a href="../index.php" class="btn btn-link text-decoration-none text-muted small">Go back to Marketplace</a>
                         </div>
                     </form>
                 </div>
@@ -214,7 +211,6 @@ include '../includes/header.php';
 </div>
 
 <script>
-// Image preview
 function previewImage(input) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
@@ -222,16 +218,12 @@ function previewImage(input) {
         reader.readAsDataURL(input.files[0]);
     }
 }
-
-// Character counter initialization
 const bioArea = document.getElementById('bio_text');
 const charCounter = document.getElementById('char-count');
-
 if(bioArea) {
     const updateCount = () => charCounter.textContent = bioArea.value.length;
     updateCount();
     bioArea.addEventListener('input', updateCount);
 }
 </script>
-
 <?php include '../includes/footer.php'; ?>

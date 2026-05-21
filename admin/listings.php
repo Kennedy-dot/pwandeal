@@ -2,12 +2,16 @@
 /**
  * PwanDeal - Manage Listings (Admin)
  */
+// Enable error reporting for debugging
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../config/database.php';
 
-// 1. ADMIN ACCESS CONTROL (Assuming ID 1 is Super Admin)
+// 1. ADMIN ACCESS CONTROL (Super Admin ID: 1)
 if (!isset($_SESSION['user_id']) || $_SESSION['user_id'] !== 1) {
-    header('Location: ../auth/login.php');
+    header('Location: /pwandeal/auth/login.php');
     exit();
 }
 
@@ -43,7 +47,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->begin_transaction();
         try {
             // Delete images from DB
-            $conn->query("DELETE FROM listing_images WHERE listing_id = $listing_id");
+            $del_img_stmt = $conn->prepare("DELETE FROM listing_images WHERE listing_id = ?");
+            $del_img_stmt->bind_param("i", $listing_id);
+            $del_img_stmt->execute();
+
             // Delete listing
             $stmt = $conn->prepare("DELETE FROM listings WHERE listing_id = ?");
             $stmt->bind_param("i", $listing_id);
@@ -128,12 +135,12 @@ include __DIR__ . '/../includes/header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($result->num_rows > 0): ?>
+                    <?php if ($result && $result->num_rows > 0): ?>
                         <?php while ($l = $result->fetch_assoc()): ?>
                             <tr>
                                 <td class="ps-4">
                                     <div class="fw-bold text-dark mb-0"><?= htmlspecialchars($l['title']) ?></div>
-                                    <div class="text-muted" style="font-size: 0.75rem;">ID: #<?= $l['listing_id'] ?> • <?= $l['cat'] ?></div>
+                                    <div class="text-muted" style="font-size: 0.75rem;">ID: #<?= $l['listing_id'] ?> • <?= htmlspecialchars($l['cat']) ?></div>
                                 </td>
                                 <td>
                                     <div class="small"><?= htmlspecialchars($l['provider']) ?></div>
@@ -145,7 +152,7 @@ include __DIR__ . '/../includes/header.php';
                                 </td>
                                 <td class="text-end pe-4">
                                     <div class="d-flex justify-content-end gap-1">
-                                        <a href="../listings/detail.php?id=<?= $l['listing_id'] ?>" class="btn btn-sm btn-light border" title="View"><i class="bi bi-eye"></i></a>
+                                        <a href="/pwandeal/listings/detail.php?id=<?= $l['listing_id'] ?>" class="btn btn-sm btn-light border" title="View"><i class="bi bi-eye"></i></a>
                                         <form method="POST" class="d-inline">
                                             <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                                             <input type="hidden" name="listing_id" value="<?= $l['listing_id'] ?>">
@@ -165,7 +172,7 @@ include __DIR__ . '/../includes/header.php';
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">No <?= $status ?> listings found.</td>
+                            <td colspan="5" class="text-center py-5 text-muted">No <?= htmlspecialchars($status) ?> listings found.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
@@ -186,7 +193,7 @@ include __DIR__ . '/../includes/header.php';
     <?php endif; ?>
 
     <div class="mt-4">
-        <a href="dashboard.php" class="btn btn-link text-decoration-none text-muted p-0">
+        <a href="index.php" class="btn btn-link text-decoration-none text-muted p-0">
             <i class="bi bi-arrow-left"></i> Back to Dashboard
         </a>
     </div>

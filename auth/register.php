@@ -6,7 +6,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Use __DIR__ for reliable pathing
 require_once __DIR__ . '/../config/database.php';
 
 $page_title = 'Register';
@@ -14,13 +13,11 @@ $base_url = '/pwandeal';
 $error = '';
 $success = '';
 
-// CSRF Token Generation
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // CSRF check
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
         die('Invalid security token.');
     }
@@ -29,12 +26,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $school = trim($_POST['school'] ?? '');
     $year = trim($_POST['year'] ?? '');
+    $student_number = trim($_POST['student_number'] ?? ''); // Added
     $password = $_POST['password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
 
-    // Validation
-    if (empty($name) || empty($email) || empty($school) || empty($year) || empty($password)) {
-        $error = 'All fields are required.';
+    if (empty($name) || empty($email) || empty($school) || empty($year) || empty($password) || empty($student_number)) {
+        $error = 'All fields (including Student Number) are required.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL) || !str_ends_with($email, '@pwani.ac.ke')) {
         $error = 'Please use a valid @pwani.ac.ke email address.';
     } elseif (strlen($password) < 6) {
@@ -42,19 +39,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($password !== $confirm_password) {
         $error = 'Passwords do not match.';
     } else {
-        // Check for existing email
-        $stmt = $conn->prepare('SELECT user_id FROM users WHERE email = ?');
-        $stmt->bind_param('s', $email);
+        // Check for existing email OR student_number
+        $stmt = $conn->prepare('SELECT user_id FROM users WHERE email = ? OR student_number = ?');
+        $stmt->bind_param('ss', $email, $student_number);
         $stmt->execute();
         if ($stmt->get_result()->num_rows > 0) {
-            $error = 'This email is already registered.';
+            $error = 'This email or student number is already registered.';
         } else {
-            // Success Path
             $verification_code = random_int(100000, 999999);
             $hashed_password = password_hash($password, PASSWORD_BCRYPT);
             
-            $stmt = $conn->prepare('INSERT INTO users (name, email, password, school, year_of_study, verification_code, is_verified) VALUES (?, ?, ?, ?, ?, ?, 0)');
-$stmt->bind_param('sssssi', $name, $email, $hashed_password, $school, $year, $verification_code);
+            $stmt = $conn->prepare('INSERT INTO users (name, email, password, school, year_of_study, student_number, verification_code, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, 0)');
+            $stmt->bind_param('ssssssi', $name, $email, $hashed_password, $school, $year, $student_number, $verification_code);
+            
             if ($stmt->execute()) {
                 $_SESSION['verify_email'] = $email; 
                 $success = 'Account created! Your verification code is: <strong>' . $verification_code . '</strong>';
@@ -76,32 +73,29 @@ include __DIR__ . '/../includes/header.php';
                     <h2 class="fw-bold mb-0">📝 Join PwanDeal</h2>
                     <p class="small mb-0 opacity-75">Exclusively for Pwani University Students</p>
                 </div>
-
                 <div class="card-body p-4 p-md-5">
-                    <?php if ($error): ?>
-                        <div class="alert alert-danger border-0 small">❌ <?= $error ?></div>
-                    <?php endif; ?>
+                    <?php if ($error): ?> <div class="alert alert-danger border-0 small">❌ <?= $error ?></div> <?php endif; ?>
                     
                     <?php if ($success): ?>
                         <div class="text-center py-3">
                             <div class="alert alert-success border-0"><?= $success ?></div>
-                            <p class="text-muted small">Normally, this would be sent to your email. Please copy it above to verify.</p>
                             <a href="/pwandeal/auth/verify.php" class="btn btn-primary px-4" style="background-color: #028090; border: none;">Proceed to Verify</a>
                         </div>
                     <?php else: ?>
                         <form method="POST" action="">
                             <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-
                             <div class="mb-3">
                                 <label class="form-label small fw-bold">Full Name</label>
-                                <input type="text" name="name" class="form-control" placeholder="John Doe" value="<?= htmlspecialchars($name ?? '') ?>" required>
+                                <input type="text" name="name" class="form-control" required>
                             </div>
-
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Student Number</label>
+                                <input type="text" name="student_number" class="form-control" placeholder="e.g. E12/1234/2023" required>
+                            </div>
                             <div class="mb-3">
                                 <label class="form-label small fw-bold">University Email</label>
-                                <input type="email" name="email" class="form-control" placeholder="name@pwani.ac.ke" value="<?= htmlspecialchars($email ?? '') ?>" required>
+                                <input type="email" name="email" class="form-control" placeholder="name@pwani.ac.ke" required>
                             </div>
-
                             <div class="row">
                                 <div class="col-md-7 mb-3">
                                     <label class="form-label small fw-bold">School/Faculty</label>
@@ -126,34 +120,23 @@ include __DIR__ . '/../includes/header.php';
                                     </select>
                                 </div>
                             </div>
-
                             <div class="mb-3">
                                 <label class="form-label small fw-bold">Password</label>
-                                <input type="password" name="password" id="password" class="form-control" placeholder="Min. 6 characters" required>
+                                <input type="password" name="password" id="password" class="form-control" required>
                             </div>
-
                             <div class="mb-4">
                                 <label class="form-label small fw-bold">Confirm Password</label>
                                 <input type="password" name="confirm_password" id="confirm_password" class="form-control" onkeyup="checkPasswordMatch()" required>
                                 <div id="match-msg" class="form-text"></div>
                             </div>
-
-                            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" style="background-color: #028090; border: none;">
-                                Create Account
-                            </button>
+                            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" style="background-color: #028090; border: none;">Create Account</button>
                         </form>
-
-                        <div class="text-center mt-4">
-                            <span class="text-muted small">Already have an account?</span> 
-                            <a href="/pwandeal/auth/login.php" class="small fw-bold text-decoration-none" style="color: #028090;">Login</a>
-                        </div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
 <script>
 function checkPasswordMatch() {
     const p = document.getElementById('password').value;
@@ -161,10 +144,7 @@ function checkPasswordMatch() {
     const m = document.getElementById('match-msg');
     if(c.length > 0) {
         m.innerHTML = (p === c) ? '<span class="text-success small">✓ Passwords match</span>' : '<span class="text-danger small">× Passwords do not match</span>';
-    } else {
-        m.innerHTML = '';
-    }
+    } else { m.innerHTML = ''; }
 }
 </script>
-
 <?php include __DIR__ . '/../includes/footer.php'; ?>
